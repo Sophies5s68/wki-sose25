@@ -19,14 +19,14 @@ def feature_extraction(signals,fs):
      # Fourier und plv hier einmal berechnen, damit keine Doppelung
     # aber Features einzeln ausgewählt
         f, spectrum = signal.welch(channel,fs)
-        plvs = plv_series(2,0.5,channel,fs)
+        #plvs = plv_series(1,0.25,channel,fs)
         features = list()
         features.extend(spectral_power(f,spectrum))
         features.extend(mean_spectral_amplitude(f,spectrum))
         features.append(spectral_entropy(f,spectrum))
-        features.append(plv_peak(plvs))
-        features.append(plv_avg(plvs))
-        features.append(plv_power(plvs))
+        #features.append(plv_peak(plvs))
+        #features.append(plv_avg(plvs))
+        #features.append(plv_power(plvs))
         
         feature_matr.append(np.asarray(features))
         
@@ -37,8 +37,9 @@ def feature_extraction(signals,fs):
 
 # features standardisieren Spaltenweise
 def standardize_matrix(matr):
-    mean = matr.mean(axis=0, keepdims=True)
-    std = matr.std(axis=0, keepdims=True)
+    mean = matr.mean(axis=0)
+    std = matr.std(axis=0)
+    std[std == 0] = 1  # verhinder Division durch 0
     return (matr - mean) / std
 
 
@@ -56,20 +57,24 @@ def compute_plv (sig,fs):
     phase_diff = phase_low - amp_high_phase
     complex_phase_diff = np.exp(1j * phase_diff)
     plv = np.abs(np.mean(complex_phase_diff))
-    
+    if np.isnan(plv):
+        plv = 0
     return plv
     
 def plv_series(window_length, step, sig, fs):
-
     win_samples = int(window_length * fs)
     step_samples = int(step * fs)
-    plvs_list = list()
-    
-    for start_index in range(0, len(sig) - win_samples, step_samples):
+    plvs_list = []
+
+    if len(sig) < win_samples:
+        return np.array([0])  # oder np.zeros(n) oder np.nan – je nach Wunsch
+
+    for start_index in range(0, len(sig) - win_samples + 1, step_samples):
         window = sig[start_index:start_index + win_samples]
         plv = compute_plv(window, fs)
         plvs_list.append(plv)
-        plvs = np.asarray(plvs_list)
+
+    plvs = np.asarray(plvs_list)
     return plvs
     
 #  Vektor mit spectral power für [0]delta, [1]theta, [2]alpha, [3]beta 

@@ -18,6 +18,7 @@ class GCN(torch.nn.Module):
         self.conv1 = GCNConv(in_channels, hidden_channels)
         self.conv2 = GCNConv(hidden_channels, hidden_channels)
         self.lin = Linear(hidden_channels, out_channels)
+        
 # Hier können wir mit den verschiedene Activation functions rumprobieren, relu, leaky relu, sigmoid,....
     def forward(self, x, edge_index, batch):
         x = self.conv1(x, edge_index)
@@ -30,7 +31,7 @@ class GCN(torch.nn.Module):
 
 # Jetzt starten wir das Training
 # Initialisierung des Models mit genauen Daten
-in_channels = 12
+in_channels = 9
 model = GCN(in_channels = in_channels, hidden_channels =32) # Man geht bei der Anzahl in 2^n Schritten also nächst größere wär 64, glaub hat was mit bits zu tun oder so
 optimizer = torch.optim.Adam(model.parameters(), lr = 0.0005) # können auch anderen Optimizer ausprobieren und mit der learning rate auch rum tunen 
 # Compute the Graph weights
@@ -39,8 +40,8 @@ weight_0 = 100 / (2 * 64)
 weight_1 = 100 / (2 * 36)
 
 class_weights = torch.tensor([weight_0, weight_1], dtype=torch.float)
-loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
-#loss_fn = torch.nn.CrossEntropyLoss() # Loss function fur binary classification
+#loss_fn = torch.nn.CrossEntropyLoss(weight=class_weights)
+loss_fn = torch.nn.CrossEntropyLoss() # Loss function fur binary classification
 
 # Training Loop
 
@@ -70,7 +71,6 @@ def evaluate_model(loader):
             correct = correct + (pred == batch.y).sum().item()
             y_true.extend(batch.y.tolist())
             y_pred.extend(pred.tolist())
-    print(classification_report(y_true, y_pred, digits=3))
     acc = sum(p == t for p, t in zip(y_pred, y_true)) / len(y_true)
     return acc
 
