@@ -5,7 +5,7 @@ from preprocess import process_eeg, process_without_mne
 from features import feature_extraction
 
 # Definiere ein festes Set an EEG channels für Graphbuilding
-standard_channels = [ 'Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'T3', 'T4']
+standard_channels = ['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T3', 'T4', 'T5', 'T6', 'Fz', 'Cz', 'Pz']
 n_nodes = len(standard_channels)
 
 
@@ -48,6 +48,44 @@ def create_cnn_dataset(ids, channels_list, data_list, fs_list, ref_list, label_l
     print(f"{len(dataset)} windows created")
     torch.save(dataset, "cnn_dataset.pt")
     return 
+
+def create_cnn_dataset_map(ids, channels_list, data_list, fs_list, ref_list, label_list):
+
+    dataset = []
+    lowest_sampling = np.min(fs_list)
+
+    for i in range(len(ids)):
+        print(f"\n--- Subject {i} --- ID: {ids[i]}")
+        channels = channels_list[i]
+        data = data_list[i]
+        fs = fs_list[i]
+        ref = ref_list[i]
+        label, onset, offset = label_list[i]
+        label = int(label)
+
+        # Preprocessing
+        clean_data = process_without_mne(data, fs, channels, ref, lowest_sampling)
+
+        # Channel-Mapping (Standardisierung auf gleiche Reihenfolge und Shape)
+        channel_map = {ch: idx for idx, ch in enumerate(channels)}
+        pad_data = np.zeros((n_nodes, clean_data.shape[1]))
+        for j, ch in enumerate(standard_channels):
+            if ch in channel_map:
+                pad_data[j] = clean_data[channel_map[ch]]
+
+        # Fenster extrahieren
+        windows, window_labels = window_data(pad_data, fs, window_size, step_size, label, onset, offset)
+        
+        # Feature extraction and brain map calculation
+        for w, l in zip(windows,window_labels):
+            features = feature_extraction(w, lowest_sampling) # shape: (n_channels, n_features)
+            brain_map = create_fixed_grid_maps(features,channels)
+            x = torch.tensor(brain_map, dtype = torch.float)
+            y = torch.tensor(l, dtype = torch.long)
+            dataset.append((x,y))
+    torch.save(dataset, "cnn_map_dataset.pt")
+    print("Dataset mit Maps erstellt")
+    return 
     
 def window_data(data, fs, window_size_sec, step_size_sec,label,label_onset,label_offset):
     window_size = int(window_size_sec * fs)
@@ -67,3 +105,27 @@ def window_data(data, fs, window_size_sec, step_size_sec,label,label_onset,label
         window = data[:, start:stop]
         windows.append(window)
     return windows, window_labels
+
+def create_fixed_grid_maps(features, channels):
+    layout = [
+    [0,   'Fp1',  0,   'Fp2',  0],
+    ['F7', 'F3', 'Fz', 'F4', 'F8'],
+    ['T3', 'C3', 'Cz', 'C4', 'T4'],
+    ['T5', 'P3', 'Pz', 'P4', 'T6'],
+    [0,   'O1',  0,   'O2',  0]]
+    
+    channel_idx = {ch: i for i, ch in enumerate(channels)}
+    
+    n_features = features.shape[1]
+    H, W = len(layout), len(layout[0])
+    brain_maps = np.zeros((n_features, H, W))
+    
+    for i_feat in range(n_features):
+        for i in range(H):
+            for j in range(W):
+                ch = layout[i][j]
+                if ch != 0 and ch in channel_idx:
+                    ch_index = channel_idx[ch]
+                    brain_maps[i_feat, i, j] = features[ch_index, i_feat]
+    return brain_maps
+                    
