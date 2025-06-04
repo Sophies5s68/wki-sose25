@@ -12,7 +12,7 @@ n_nodes = len(standard_channels)
 window_size = 4.0
 step_size = 1
 
-def create_cnn_dataset(ids, channels_list, data_list, fs_list, ref_list, label_list):
+def create_cnn_dataset(ids, channels_list, data_list, fs_list, ref_list, label_list, index):
 
     dataset = []
     lowest_sampling = np.min(fs_list)
@@ -46,16 +46,16 @@ def create_cnn_dataset(ids, channels_list, data_list, fs_list, ref_list, label_l
             dataset.append((x, y))
     
     print(f"{len(dataset)} windows created")
-    torch.save(dataset, "cnn_dataset.pt")
+    torch.save(dataset, f"data/cnn_dataset_{index}.pt")
     return 
 
-def create_cnn_dataset_map(ids, channels_list, data_list, fs_list, ref_list, label_list):
+def create_cnn_dataset_map(ids, channels_list, data_list, fs_list, ref_list, label_list,index=0):
 
     dataset = []
     lowest_sampling = np.min(fs_list)
 
     for i in range(len(ids)):
-        print(f"\n--- Subject {i} --- ID: {ids[i]}")
+        #print(f"\n--- Subject {i} --- ID: {ids[i]}")
         channels = channels_list[i]
         data = data_list[i]
         fs = fs_list[i]
@@ -65,6 +65,7 @@ def create_cnn_dataset_map(ids, channels_list, data_list, fs_list, ref_list, lab
 
         # Preprocessing
         clean_data = process_without_mne(data, fs, channels, ref, lowest_sampling)
+        assert not np.isnan(clean_data).any(), "NaN in clean_data!"
 
         # Channel-Mapping (Standardisierung auf gleiche Reihenfolge und Shape)
         channel_map = {ch: idx for idx, ch in enumerate(channels)}
@@ -72,6 +73,7 @@ def create_cnn_dataset_map(ids, channels_list, data_list, fs_list, ref_list, lab
         for j, ch in enumerate(standard_channels):
             if ch in channel_map:
                 pad_data[j] = clean_data[channel_map[ch]]
+            assert not np.isnan(pad_data).any(), "NaN in pad_data!"
 
         # Fenster extrahieren
         windows, window_labels = window_data(pad_data, fs, window_size, step_size, label, onset, offset)
@@ -79,11 +81,13 @@ def create_cnn_dataset_map(ids, channels_list, data_list, fs_list, ref_list, lab
         # Feature extraction and brain map calculation
         for w, l in zip(windows,window_labels):
             features = feature_extraction(w, lowest_sampling) # shape: (n_channels, n_features)
+            assert not np.isnan(features).any(), "NaN in features!"
             brain_map = create_fixed_grid_maps(features,channels)
+            assert not np.isnan(brain_map).any(), "NaN in brain_map!"
             x = torch.tensor(brain_map, dtype = torch.float)
             y = torch.tensor(l, dtype = torch.long)
             dataset.append((x,y))
-    torch.save(dataset, "cnn_map_dataset.pt")
+    torch.save(dataset, f"data/cnn_map_dataset_{index}.pt")
     print("Dataset mit Maps erstellt")
     return 
     

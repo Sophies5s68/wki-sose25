@@ -18,8 +18,9 @@ from wettbewerb import get_3montages
 import mne
 from scipy import signal as sig
 import ruptures as rpt
-
-
+import torch 
+import torch.nn as nn
+from CNN_model import CNN_EEG
 
 ###Signatur der Methode (Parameter und Anzahl return-Werte) darf nicht verändert werden
 def predict_labels(channels : List[str], data : np.ndarray, fs : float, reference_system: str, model_name : str='model.json') -> Dict[str,Any]:
@@ -55,9 +56,9 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     offset_confidence = 0   # gibt die Unsicherheit bezüglich des Endes an (optional)
 
     # Hier könnt ihr euer vortrainiertes Modell laden (Kann auch aus verschiedenen Dateien bestehen)
-    with open(model_name, 'rb') as f:  
-        parameters = json.load(f)         # Lade simples Model (1 Parameter)
-        th_opt = parameters['std_thresh']
+    model = MyCNN()
+    model.load_state_dict(torch.load(model_name, map_location='cpu'))
+    model.eval()
 
     
     # Wende Beispielcode aus Vorlesung an 

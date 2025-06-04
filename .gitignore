@@ -137,3 +137,5 @@ PREDICTIONS.csv
 
 # VS Code Data
 .vscode/
+data/
+data_test
