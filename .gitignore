@@ -138,4 +138,6 @@ PREDICTIONS.csv
 # VS Code Data
 .vscode/
 data/
-data_test
+data_test/
+cnn_dataset.pt
+cnn_map_dataset.pt
