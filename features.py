@@ -79,28 +79,61 @@ def plv_series(window_length, step, sig, fs):
     
 #  Vektor mit spectral power für [0]delta, [1]theta, [2]alpha, [3]beta 
 def spectral_power(f,spectrum):
-    extracted = list()
+    extracted = []
     for band, (fmin, fmax) in bands.items():
         idx_band = np.logical_and(f >= fmin, f <= fmax)
-        band_power = np.mean(spectrum[idx_band])
-        extracted.append(band_power)   
-    extracted = np.asarray(extracted)
-    return extracted
+        values = spectrum[idx_band]
+        if values.size == 0 or not np.isfinite(values).any():
+            extracted.append(0.0)
+        else:
+            extracted.append(np.nanmean(values))
+    
+    assert not np.isnan(extracted).any(), "NaN in power!"
+    return np.array(extracted)
+
 
 def mean_spectral_amplitude(f,spectrum):
-    extracted = list()
-    amp = np.sqrt(spectrum)
+    spectrum_clipped = np.clip(spectrum, 0, None)
+    amp = np.sqrt(spectrum_clipped)
+    extracted = []
     for band, (fmin, fmax) in bands.items():
         idx_band = np.logical_and(f >= fmin, f <= fmax)
-        mean_amp = np.mean(amp[idx_band])
-        extracted.append(mean_amp)   
-    extracted = np.asarray(extracted)
-    return extracted
+        values = amp[idx_band]
+        if values.size == 0 or not np.isfinite(values).any():
+            extracted.append(0.0)
+        else:
+            extracted.append(np.nanmean(values))
+            
+    assert not np.isnan(extracted).any(), "NaN in amplitude!"
+    return np.array(extracted)
 
-def spectral_entropy(f,spectrum): 
-    psd_norm = spectrum / np.sum(spectrum) 
-    de = entropy(psd_norm) 
-    de /= np.log(len(spectrum))
+
+def spectral_entropy(f, spectrum, base=np.e): 
+    
+    spectrum = np.asarray(spectrum, dtype=np.float64)
+    total_power = np.sum(spectrum)
+    if total_power <= 0 or np.isnan(total_power):
+        return 0.0
+
+    # Normieren des Spektrums zu einer Wahrscheinlichkeitsverteilung
+    psd_norm = spectrum / total_power
+    # Clip auf kleinen Epsilon-Bereich, um log(0) zu vermeiden
+    epsilon = 1e-12
+    psd_norm = np.clip(psd_norm, epsilon, 1)
+    # Berechne Shannon-Entropie
+    log_fn = np.log if base == np.e else np.log2
+    entropy_val = -np.sum(psd_norm * log_fn(psd_norm))
+    
+    # Normalisiere mit log der Anzahl der Bins
+    norm_factor = log_fn(len(psd_norm))
+    if norm_factor <= 0 or np.isnan(norm_factor):
+        return 0.0
+
+    de = entropy_val / norm_factor
+    # Letzte Sicherheit
+    if np.isnan(de) or np.isinf(de):
+        return 0.0
+
     return de
 
 def plv_peak(plvs):
