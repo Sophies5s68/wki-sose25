@@ -20,9 +20,10 @@ from scipy import signal as sig
 import ruptures as rpt
 import torch 
 import torch.nn as nn
-from CNN_model import CNN_EEG, window_data_evaluate, create_fixed_grid_maps
+from CNN_model import CNN_EEG
 from preprocess import process_without_mne
 from features import feature_extraction
+from CNN_dataset import window_data_evaluate, create_fixed_grid_maps
 
 ###Signatur der Methode (Parameter und Anzahl return-Werte) darf nicht verändert werden
 def predict_labels(channels : List[str], data : np.ndarray, fs : float, reference_system: str, model_name : str='model.json') -> Dict[str,Any]:
