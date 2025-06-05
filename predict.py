@@ -59,10 +59,10 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     offset_confidence = 0   # gibt die Unsicherheit bezüglich des Endes an (optional)
 
     # Modell Aufsetzen
-    model = CNN_EEG(in_channels=9, n_classes=2)
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    
+    model = torch.load(model_name, map_location=device)
     model.to(device)
-    model.load_state_dict(torch.load('cnn_eeg_weights.pth', map_location=device))
     model.eval()
     
     #Daten vorbereiten
@@ -83,7 +83,7 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     data_for_class = []
     # Feature extraction and brain map calculation
     for win in windows:
-        features = feature_extraction(w, fs) # shape: (n_channels, n_features)
+        features = feature_extraction(win, fs) # shape: (n_channels, n_features)
         assert not np.isnan(features).any(), "NaN in features!"
         brain_map = create_fixed_grid_maps(features, channels)
         assert not np.isnan(brain_map).any(), "NaN in brain_map!"
@@ -95,7 +95,8 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     predictions_per_window =[]
     with torch.no_grad():
         for feature_map in data_for_class:
-            output = model(feature_map)  
+            feature_map = feature_map.unsqueeze(0).to(device)
+            output = model(feature_map)
             predicted_class = torch.argmax(output, dim=1).item()
             predictions_per_window.append(predicted_class)
     
@@ -104,7 +105,7 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
         seizure_present = True
         first_idx = predictions_per_window.index(1)
         time_first = first_idx * step_size
-        onset = float(time_first)
+        onset = time_first
     '''
     # Hier könnt ihr euer vortrainiertes Modell laden (Kann auch aus verschiedenen Dateien bestehen)
     model = MyCNN()
