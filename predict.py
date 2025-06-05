@@ -21,6 +21,8 @@ import ruptures as rpt
 import torch 
 import torch.nn as nn
 from CNN_model import CNN_EEG
+from preprocess import process_without_mne, window_data_evaluate, create_fixed_grid_maps
+from features import feature_extraction
 
 ###Signatur der Methode (Parameter und Anzahl return-Werte) darf nicht verändert werden
 def predict_labels(channels : List[str], data : np.ndarray, fs : float, reference_system: str, model_name : str='model.json') -> Dict[str,Any]:
@@ -55,6 +57,54 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     offset = 999999  # gibt das Ende des Anfalls an (optional)
     offset_confidence = 0   # gibt die Unsicherheit bezüglich des Endes an (optional)
 
+    # Modell Aufsetzen
+    model = CNN_EEG(in_channels=9, n_classes=2)
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    model.to(device)
+    model.load_state_dict(torch.load('cnn_eeg_weights.pth', map_location=device))
+    model.eval()
+    
+    #Daten vorbereiten
+    window_size = 4.0
+    step_size = 1
+    standard_channels = ['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T3', 'T4', 'T5', 'T6', 'Fz', 'Cz', 'Pz']
+    n_nodes = len(standard_channels)
+
+    processed_input = process_without_mne(data, fs, channels, reference_system, fs)
+    
+    channel_map = {ch: idx for idx, ch in enumerate(channels)}
+    pad_data = np.zeros((n_nodes, processed_input.shape[1]))
+    for j, ch in enumerate(standard_channels):
+        if ch in channel_map:
+            pad_data[j] = processed_input[channel_map[ch]]
+    
+    windows = window_data_evaluate(pad_data, fs, window_size, step_size)
+    data_for_class = []
+    # Feature extraction and brain map calculation
+    for win in windows:
+        features = feature_extraction(w, fs) # shape: (n_channels, n_features)
+        assert not np.isnan(features).any(), "NaN in features!"
+        brain_map = create_fixed_grid_maps(features, channels)
+        assert not np.isnan(brain_map).any(), "NaN in brain_map!"
+        x = torch.tensor(brain_map, dtype = torch.float)
+        data_for_class.append(x)
+        
+    
+    # Klassifikation
+    predictions_per_window =[]
+    with torch.no_grad():
+        for feature_map in data_for_class:
+            output = model(feature_map)  
+            predicted_class = torch.argmax(output, dim=1).item()
+            predictions_per_window.append(predicted_class)
+    
+    seizure_present = False
+    if 1 in predictions_per_window:
+        seizure_present = True
+        first_idx = predictions_per_window.index(1)
+        time_first = first_idx * step_size
+        onset = float(time_first)
+    '''
     # Hier könnt ihr euer vortrainiertes Modell laden (Kann auch aus verschiedenen Dateien bestehen)
     model = MyCNN()
     model.load_state_dict(torch.load(model_name, map_location='cpu'))
@@ -131,7 +181,7 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
         onset = t[onset_index]      
      
      
-    
+    '''
 #------------------------------------------------------------------------------  
     prediction = {"seizure_present":seizure_present,"seizure_confidence":seizure_confidence,
                    "onset":onset,"onset_confidence":onset_confidence,"offset":offset,

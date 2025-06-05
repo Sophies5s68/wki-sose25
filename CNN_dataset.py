@@ -133,3 +133,15 @@ def create_fixed_grid_maps(features, channels):
                     brain_maps[i_feat, i, j] = features[ch_index, i_feat]
     return brain_maps
                     
+    
+def window_data_evaluate(data, fs, window_size_sec, step_size_sec):
+    window_size = int(window_size_sec * fs)
+    step_size = int(step_size_sec * fs)
+    n_samples = data.shape[1]
+    
+    windows = []
+    for start in range(0, n_samples - window_size + 1, step_size):
+        stop = start + window_size
+        window = data[:, start:stop]
+        windows.append(window)
+    return windows
