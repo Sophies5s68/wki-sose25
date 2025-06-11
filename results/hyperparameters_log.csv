@@ -1,0 +1,2 @@
+model,learning_rate,weight_decay,loss_function,class_weights,oversampling,num_epochs,batch_size,threshold,gamma,notes,f1_score
+trained_cnn_1,0.001,0.0,CrossEntropyLoss,"[0.5105078816413879, 72.87515258789062]",3.0,50,32,0.3,,Balanced CE with dynamic weights,0.28842504743833014
