@@ -9,8 +9,8 @@ standard_channels = ['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2
 n_nodes = len(standard_channels)
 
 
-window_size = 4.0
-step_size = 1
+window_size = 30.0
+step_size = 30
 
 def create_cnn_dataset(ids, channels_list, data_list, fs_list, ref_list, label_list, index):
 
@@ -87,7 +87,7 @@ def create_cnn_dataset_map(ids, channels_list, data_list, fs_list, ref_list, lab
             x = torch.tensor(brain_map, dtype = torch.float)
             y = torch.tensor(l, dtype = torch.long)
             dataset.append((x,y))
-    torch.save(dataset, f"data/cnn_map_dataset_{index}.pt")
+    torch.save(dataset, f"data_long/cnn_map_dataset_{index}.pt")
     print("Dataset mit Maps erstellt")
     return 
     

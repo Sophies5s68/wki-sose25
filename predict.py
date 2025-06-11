@@ -101,11 +101,19 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
             predictions_per_window.append(predicted_class)
     
     seizure_present = False
+    '''
     if 1 in predictions_per_window:
         seizure_present = True
         first_idx = predictions_per_window.index(1)
         time_first = first_idx * step_size
         onset = time_first
+    '''
+    for i in range(len(predictions_per_window) - 1):
+    if predictions_per_window[i] == 1 and predictions_per_window[i + 1] == 1:
+        seizure_present = True
+        time_first = i * step_size
+        onset = time_first
+        break
     '''
     # Hier könnt ihr euer vortrainiertes Modell laden (Kann auch aus verschiedenen Dateien bestehen)
     model = MyCNN()
