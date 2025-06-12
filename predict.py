@@ -90,7 +90,7 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
         x = torch.tensor(brain_map, dtype = torch.float)
         data_for_class.append(x)
         
-    
+
     # Klassifikation
     predictions_per_window =[]
     with torch.no_grad():

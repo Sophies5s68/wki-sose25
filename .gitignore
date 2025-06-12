@@ -142,3 +142,6 @@ data_test/
 cnn_dataset.pt
 cnn_map_dataset.pt
 pfad/zur/datei_oder_ordner
+data_long
+data_plv
+

@@ -7,12 +7,14 @@ class CNN_EEG(nn.Module):
         super(CNN_EEG, self).__init__()
         
         self.conv1 = nn.Conv2d(in_channels, out_channels = 64, kernel_size = (3,3), padding =1)
+        self.bn1 = nn.BatchNorm2d(64) # mal ausprobieren
         self.pool1 = nn.MaxPool2d(kernel_size=(2, 2))
         self.conv2 = nn.Conv2d(64, out_channels= 128, kernel_size = (3,3), padding =1)
+        self.bn2 = nn.BatchNorm2d(128)
         self.pool2 = nn.MaxPool2d(kernel_size=(2,2))
         self.flatten = nn.Flatten()
         self.fc1 = nn.Linear(self._get_flattened_size(in_channels), 256) # Eingangsgröße muss angepasst werden
-        self.dropout = nn.Dropout(0.5)
+        self.dropout = nn.Dropout(0.3)
         self.fc2 = nn.Linear(256, n_classes)
 
     
@@ -24,9 +26,9 @@ class CNN_EEG(nn.Module):
         return x.view(1, -1).shape[1]
         
     def forward(self, x):
-        x = F.relu(self.conv1(x))
+        x = F.relu(self.bn1(self.conv1(x)))
         x = self.pool1(x)
-        x = F.relu(self.conv2(x))
+        x = F.relu(self.bn2(self.conv2(x)))
         x = self.pool2(x)
         x = self.flatten(x)
         x = F.relu(self.fc1(x))        
@@ -56,7 +58,9 @@ def train_model(model, train_loader, optimizer, loss_fn, device='cpu'):
         optimizer.step()
         
         total_loss += loss.item()
-        preds = out.argmax(dim=1)
+        #preds = out.argmax(dim=1)
+        probs = torch.softmax(out, dim=1) # Vorschlag: keine strikte Klassifikation
+        preds = (probs[:, 1] > 0.4).int() 
         correct += (preds == y).sum().item()
         total += y.size(0)
     loss = total_loss / len(train_loader)
