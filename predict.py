@@ -24,6 +24,7 @@ from CNN_model import CNN_EEG
 from preprocess import process_without_mne
 from features import feature_extraction
 from CNN_dataset import window_data_evaluate, create_fixed_grid_maps
+from glob import glob
 
 ###Signatur der Methode (Parameter und Anzahl return-Werte) darf nicht verändert werden
 def predict_labels(channels : List[str], data : np.ndarray, fs : float, reference_system: str, model_name : str='model.json') -> Dict[str,Any]:
@@ -204,16 +205,16 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
         
 def predictions_ensemble(feature,model_name,device):
     
-    file_paths = sorted(glob(os.path.join(model_name, "*.pt")))
-    probas = np.zeros((len(X_test), len(models[0].classes_)))
-    for file in file_paths:
-        model = torch.load(model_name, map_location=device)
-        model.to(device)
-        model.eval()
-        output = model(feature)
-        probas += output
-    
-    prediction = probas/len(file_paths)
-    y_pred = (prediction[:, 1] > 0.5).long()
+    file_paths = sorted([os.path.join(model_name, f) for f in os.listdir(model_name) if f.endswith(".pth")])
+
+    probas = torch.zeros(2).to(device)  # 2 Klassen
+    with torch.no_grad():
+        for path in file_paths:
+            model = torch.load(path, map_location=device)
+            model.eval()
+            output = model(feature)  # shape: [1, 2]
+            probas += torch.softmax(output.squeeze(), dim=0)  # → shape: [2]
+
+    prediction = probas / len(file_paths)  # shape: [2]
+    y_pred = (prediction[1] > 0.5).long()  # ← sicher!
     return y_pred
-    
