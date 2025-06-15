@@ -60,11 +60,11 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
 
     # Modell Aufsetzen
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
+    '''
     model = torch.load(model_name, map_location=device)
     model.to(device)
     model.eval()
-    
+    '''
     #Daten vorbereiten
     window_size = 4.0
     step_size = 1
@@ -96,8 +96,9 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     with torch.no_grad():
         for feature_map in data_for_class:
             feature_map = feature_map.unsqueeze(0).to(device)
-            output = model(feature_map)
-            predicted_class = torch.argmax(output, dim=1).item()
+            #output = model(feature_map)
+            #predicted_class = torch.argmax(output, dim=1).item()
+            predicted_class = predictions_ensemble(feature_map,model_name,device)
             predictions_per_window.append(predicted_class)
     
     seizure_present = False
@@ -201,3 +202,18 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
                                
                                
         
+def predictions_ensemble(feature,model_name,device):
+    
+    file_paths = sorted(glob(os.path.join(model_name, "*.pt")))
+    probas = np.zeros((len(X_test), len(models[0].classes_)))
+    for file in file_paths:
+        model = torch.load(model_name, map_location=device)
+        model.to(device)
+        model.eval()
+        output = model(feature)
+        probas += output
+    
+    prediction = probas/len(file_paths)
+    y_pred = (prediction[:, 1] > 0.5).long()
+    return y_pred
+    

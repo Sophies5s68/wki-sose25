@@ -3,13 +3,14 @@ import numpy as np
 
 from preprocess import process_eeg, process_without_mne
 from features import feature_extraction
+from scipy import signal
 
 # Definiere ein festes Set an EEG channels für Graphbuilding
 standard_channels = ['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T3', 'T4', 'T5', 'T6', 'Fz', 'Cz', 'Pz']
 n_nodes = len(standard_channels)
 
 
-window_size = 30.0
+window_size = 30
 step_size = 30
 
 def create_cnn_dataset(ids, channels_list, data_list, fs_list, ref_list, label_list, index):
@@ -46,7 +47,7 @@ def create_cnn_dataset(ids, channels_list, data_list, fs_list, ref_list, label_l
             dataset.append((x, y))
     
     print(f"{len(dataset)} windows created")
-    torch.save(dataset, f"data/cnn_dataset_{index}.pt")
+    torch.save(dataset, f"data/cnn_dataset_{index}.pt") ## NICHT HIER
     return 
 
 def create_cnn_dataset_map(ids, channels_list, data_list, fs_list, ref_list, label_list,index=0):
@@ -74,11 +75,28 @@ def create_cnn_dataset_map(ids, channels_list, data_list, fs_list, ref_list, lab
             if ch in channel_map:
                 pad_data[j] = clean_data[channel_map[ch]]
             assert not np.isnan(pad_data).any(), "NaN in pad_data!"
-
+        '''
+        # Aufteilen in Bänder für Feature processing
+        alpha_data = np.zeros(pad_data.shape, dtype=complex)
+        theta_data = np.zeros(pad_data.shape, dtype=complex)
+        gamma_data = np.zeros(pad_data.shape, dtype=complex)
+        for index, dat in enumerate(pad_data):
+            alpha = bandpass_filter(dat,lowest_sampling,4,8)
+            alpha_data[index] = signal.hilbert(alpha)
+            theta = bandpass_filter(dat,lowest_sampling,1,4)
+            theta_data[index] = signal.hilbert(theta)
+            gamma = bandpass_filter(dat,lowest_sampling,30,120)
+            gamma_data[index] = signal.hilbert(gamma)
+        ''' 
         # Fenster extrahieren
         windows, window_labels = window_data(pad_data, fs, window_size, step_size, label, onset, offset)
+        #alpha_windows = window_nolabel(alpha_data,fs,window_size,step_size)
+        #theta_windows = window_nolabel(theta_data,fs,window_size,step_size)
+        #gamma_windows = window_nolabel(gamma_data,fs,window_size,step_size)
         
         # Feature extraction and brain map calculation
+        #for w, l, a, t, g in zip(windows,window_labels,alpha_windows,theta_windows,gamma_windows):
+        
         for w, l in zip(windows,window_labels):
             features = feature_extraction(w, lowest_sampling) # shape: (n_channels, n_features)
             assert not np.isnan(features).any(), "NaN in features!"
@@ -86,8 +104,9 @@ def create_cnn_dataset_map(ids, channels_list, data_list, fs_list, ref_list, lab
             assert not np.isnan(brain_map).any(), "NaN in brain_map!"
             x = torch.tensor(brain_map, dtype = torch.float)
             y = torch.tensor(l, dtype = torch.long)
-            dataset.append((x,y))
-    torch.save(dataset, f"data_long/cnn_map_dataset_{index}.pt")
+            patient_id = ids[i].split("_")[0]
+            dataset.append((x,y,patient_id))
+    torch.save(dataset, f"data_test/cnn_map_dataset_{index}.pt")
     print("Dataset mit Maps erstellt")
     return 
     
@@ -109,6 +128,17 @@ def window_data(data, fs, window_size_sec, step_size_sec,label,label_onset,label
         window = data[:, start:stop]
         windows.append(window)
     return windows, window_labels
+
+def window_nolabel(data,fs,window_size_sec,step_size_sec):
+    window_size = int(window_size_sec * fs)
+    step_size = int(step_size_sec * fs)
+    n_samples = data.shape[1]
+    windows = []
+    for start in range(0, n_samples - window_size + 1, step_size):
+        stop = start + window_size
+        window = data[:, start:stop]
+        windows.append(window)
+    return windows
 
 def create_fixed_grid_maps(features, channels):
     layout = [
@@ -145,3 +175,11 @@ def window_data_evaluate(data, fs, window_size_sec, step_size_sec):
         window = data[:, start:stop]
         windows.append(window)
     return windows
+
+# Test das Filtern hierher zu verlegn für bessere Laufzeit
+def bandpass_filter(sig, fs, lowcut, highcut,numtaps=101, window='hamming'):
+    nyq = 0.5 * fs
+    low = lowcut / nyq
+    high = highcut / nyq
+    taps = signal.firwin(numtaps, [low, high], pass_zero=False, window=window)
+    return signal.lfilter(taps,1.0,sig)

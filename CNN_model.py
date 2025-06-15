@@ -78,7 +78,7 @@ def evaluate_model(model, test_loader, device='cpu'):
             x, y = x.to(device), y.to(device)
             out = model(x)
             probs = torch.softmax(out, dim=1)
-            pred = (probs[:, 1] > 0.3).long()
+            pred = (probs[:, 1] > 0.5).long() # Hattest du das extra so tief gesetzt?
             correct += (pred == y).sum().item()
             y_true.extend(y.cpu().tolist())
             y_pred.extend(pred.cpu().tolist())
