@@ -10,8 +10,8 @@ standard_channels = ['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2
 n_nodes = len(standard_channels)
 
 
-window_size = 30
-step_size = 30
+window_size = 4
+step_size = 1
 
 def create_cnn_dataset(ids, channels_list, data_list, fs_list, ref_list, label_list, index):
 
