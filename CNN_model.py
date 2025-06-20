@@ -1,6 +1,7 @@
 import torch 
 import torch.nn as nn 
 import torch.nn.functional as F
+from sklearn.metrics import f1_score
 
 class CNN_EEG(nn.Module):
     def __init__(self, in_channels, n_classes):
@@ -9,31 +10,39 @@ class CNN_EEG(nn.Module):
         self.conv1 = nn.Conv2d(in_channels, out_channels = 64, kernel_size = (3,3), padding =1)
         self.bn1 = nn.BatchNorm2d(64) # mal ausprobieren
         self.pool1 = nn.MaxPool2d(kernel_size=(2, 2))
+        self.dropout1 = nn.Dropout2d(0.25)
+        
         self.conv2 = nn.Conv2d(64, out_channels= 128, kernel_size = (3,3), padding =1)
         self.bn2 = nn.BatchNorm2d(128)
         self.pool2 = nn.MaxPool2d(kernel_size=(2,2))
-        self.flatten = nn.Flatten()
-        self.fc1 = nn.Linear(self._get_flattened_size(in_channels), 256) # Eingangsgröße muss angepasst werden
-        self.dropout = nn.Dropout(0.3)
-        self.fc2 = nn.Linear(256, n_classes)
+        self.dropout2 = nn.Dropout2d(0.25)
+        
+        flattened_size = self._get_flattened_size(in_channels) # Eingangsgröße muss angepasst werden
+        self.classifier = nn.Sequential(
+            nn.Linear(flattened_size, 512),
+            nn.ReLU(),
+            nn.Dropout(0.5),
+            nn.Linear(512, 128),
+            nn.ReLU(),
+            nn.Dropout(0.3),
+            nn.Linear(128, n_classes)
+        )
 
     
     def _get_flattened_size(self, in_channels):
         with torch.no_grad():
-            x = torch.zeros(1, in_channels, 5, 5)  # your brain map size
+            x = torch.zeros(1, in_channels, 6, 15)  # your brain map size
             x = self.pool1(F.relu(self.conv1(x)))
             x = self.pool2(F.relu(self.conv2(x)))
         return x.view(1, -1).shape[1]
         
     def forward(self, x):
         x = F.relu(self.bn1(self.conv1(x)))
-        x = self.pool1(x)
+        x = self.pool1(self.dropout1(x))
         x = F.relu(self.bn2(self.conv2(x)))
-        x = self.pool2(x)
-        x = self.flatten(x)
-        x = F.relu(self.fc1(x))        
-        x = self.dropout(x)
-        x = self.fc2(x)                
+        x = self.pool2(self.dropout2(x))
+        x = torch.flatten(x, 1)
+        x = self.classifier(x)
         return x
     
 
@@ -60,7 +69,7 @@ def train_model(model, train_loader, optimizer, loss_fn, device='cpu'):
         total_loss += loss.item()
         #preds = out.argmax(dim=1)
         probs = torch.softmax(out, dim=1) # Vorschlag: keine strikte Klassifikation
-        preds = (probs[:, 1] > 0.4).int() 
+        preds = (probs[:, 1] > 0.3).int() 
         correct += (preds == y).sum().item()
         total += y.size(0)
     loss = total_loss / len(train_loader)
@@ -84,7 +93,8 @@ def evaluate_model(model, test_loader, device='cpu'):
             y_pred.extend(pred.cpu().tolist())
 
     accuracy = correct / len(y_true)
-    return accuracy, y_true, y_pred
+    f1 = f1_score(y_true, y_pred, average='binary')
+    return accuracy, y_true, y_pred, f1
 
 def train_modelold(model, train_loader, optimizer, loss_fn, device='cpu'):
     model.train()

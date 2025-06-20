@@ -67,8 +67,8 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     model.eval()
     '''
     #Daten vorbereiten
-    window_size = 4.0
-    step_size = 1
+    window_size = 30.0
+    step_size = 30.0
     standard_channels = ['Fp1', 'Fp2', 'F3', 'F4', 'C3', 'C4', 'P3', 'P4', 'O1', 'O2', 'F7', 'F8', 'T3', 'T4', 'T5', 'T6', 'Fz', 'Cz', 'Pz']
     n_nodes = len(standard_channels)
 

@@ -144,4 +144,8 @@ cnn_dataset.pt
 cnn_map_dataset.pt
 data_long/
 data_plv/
-
+positive_daten.pkl
+positive.filtered.pkl
+montage_datasets/
+preprocessed_data/
+data_30sec/

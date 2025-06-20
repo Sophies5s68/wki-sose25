@@ -1,0 +1,4 @@
+Fold 1
+  Test accuracy:  1.00
+  Train accuracy: 1.00
+

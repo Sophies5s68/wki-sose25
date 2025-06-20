@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 from scipy import signal
 from scipy.stats import entropy
 from multiprocessing import Pool
+from antropy import perm_entropy
 
 bands = ({ 'delta' : [1,4],
                 'theta' : [4, 8],
@@ -22,18 +23,24 @@ def feature_extraction(signals,fs):
     # aber Features einzeln ausgewählt
         f, spectrum = signal.welch(channel,fs)
         idx_dict = get_band_indices(f)
+        activity, mobility, complexity = hjorthparameters(channel)
+        fd = petrosian_fd(channel)
         #phi_alpha = np.angle(a)
         #phi_theta = np.angle(t)
         #amp_gamma = np.abs(g)
         #amp_hil = signal.hilbert(amp_gamma)
-        #phi_amp_gamma = np.angle(amp_hil)
+       # phi_amp_gamma = np.angle(amp_hil)
     
         features = list()
         features.extend(spectral_power(spectrum, idx_dict))
         features.extend(mean_spectral_amplitude(spectrum, idx_dict))
+        features.extend([activity, mobility, complexity])
         features.append(spectral_entropy(f, spectrum))
+        features.extend(hjorthparameters(channel))
+        features.append(petrosian_fd(channel))
         #features.append(CFC_alpha_gamma(phi_alpha, phi_amp_gamma))
         #features.append(CFC_theta_gamma(phi_theta, phi_amp_gamma))
+        
         
         
         feature_matr.append(np.asarray(features))
@@ -188,6 +195,26 @@ def CFC_theta_gamma(phi_theta, phi_amp_gamma):
     plv = np.abs(np.mean(complex_phase_diff))
     return plv
 
+def hjorthparameters(signal):
+    signal = np.asarray(signal)
+    first_deriv = np.diff(signal)
+    second_deriv = np.diff(first_deriv)
+    
+    activity = np.var(signal)
+    mobility = np.sqrt(np.var(first_deriv)/(activity + 1e-10))
+    complexity = np.sqrt(np.var(second_deriv) / (np.var(first_deriv) + 1e-10)) / (mobility + 1e-10)
+    
+    return activity, mobility, complexity
+
+def petrosian_fd(signal):
+    signal = np.asarray(signal)
+    diff = np.diff(signal)
+    N = len(signal)
+    sign_changes = np.sum(diff[1:] * diff[:-1] < 0)
+
+    if N == 0 or sign_changes == 0:
+        return 0.0
+    return np.log10(N) / (np.log10(N) + np.log10(N / (N + 0.4 * sign_changes)))
     
     
     

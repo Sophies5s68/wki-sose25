@@ -1,0 +1,20 @@
+Fold 1
+  Test accuracy:  0.90
+  Train accuracy: 0.96
+
+Fold 2
+  Test accuracy:  0.91
+  Train accuracy: 0.95
+
+Fold 3
+  Test accuracy:  0.92
+  Train accuracy: 0.95
+
+Fold 4
+  Test accuracy:  0.92
+  Train accuracy: 0.91
+
+Fold 5
+  Test accuracy:  0.96
+  Train accuracy: 0.94
+
