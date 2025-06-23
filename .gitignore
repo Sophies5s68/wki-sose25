@@ -138,16 +138,20 @@ PREDICTIONS.csv
 
 # VS Code Data
 .vscode/
-data/
-data_test/
-cnn_dataset.pt
-cnn_map_dataset.pt
-data_long/
-data_plv/
-positive_daten.pkl
-positive.filtered.pkl
+alt/data/
+alt/data_test/
+alt/cnn_dataset.pt
+alt/cnn_map_dataset.pt
+alt/data_long/
+alt/data_plv/
+LSTM/positive_daten.pkl
+LSTM/positive.filtered.pkl
 montage_datasets/
-preprocessed_data/
-data_30sec/
-datasets/
-positive_filtered.pkl
+alt/preprocessed_data/
+alt/data_30sec/
+alt/datasets/
+LSTM/positive_filtered.pkl
+LSTM/batches_LSTM/
+LSTM/positive_filtered_100Hz.pkl
+data_features_sep/
+

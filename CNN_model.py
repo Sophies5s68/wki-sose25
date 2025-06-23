@@ -52,29 +52,35 @@ def train_model(model, train_loader, optimizer, loss_fn, device='cpu'):
     correct = 0
     total = 0
     for x, y in train_loader:
-        x, y = x.to(device), y.to(device)
+        x = x.to(device)
+        y = y.to(device).float().unsqueeze(1)  # Labels als Float und [Batch,1]
+
         optimizer.zero_grad()
         with torch.autograd.set_detect_anomaly(True):
-            out = model(x)
-            if torch.isnan(out).any() or torch.isinf(out).any():
+            logits = model(x)               # Roh-Output, Shape [B,1]
+            probs = torch.sigmoid(logits)  # Wahrscheinlichkeiten
+
+            if torch.isnan(probs).any() or torch.isinf(probs).any():
                 print("NaN oder Inf im Output des Modells!")
-                print("Minimum:", out.min().item(), "Maximum:", out.max().item())
+                print("Minimum:", probs.min().item(), "Maximum:", probs.max().item())
                 raise ValueError("Ungültige Werte im Modell-Output")
-            loss = loss_fn(out, y)
+
+            loss = loss_fn(probs, y)  # Dice Loss erwartet Wahrscheinlichkeiten und Float-Labels
             loss.backward()
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
-        
+
         total_loss += loss.item()
-        #preds = out.argmax(dim=1)
-        probs = torch.softmax(out, dim=1) # Vorschlag: keine strikte Klassifikation
-        preds = (probs[:, 1] > 0.3).int() 
-        correct += (preds == y).sum().item()
+        
+        preds = (probs > 0.5).long()
+        correct += (preds == y.long()).sum().item()
         total += y.size(0)
-    loss = total_loss / len(train_loader)
+
+    avg_loss = total_loss / len(train_loader)
     accuracy = correct / total
-    return loss , accuracy
+    return avg_loss, accuracy
+
 
 def evaluate_model(model, test_loader, device='cpu'):
     model.eval()
@@ -86,15 +92,18 @@ def evaluate_model(model, test_loader, device='cpu'):
         for x, y in test_loader:
             x, y = x.to(device), y.to(device)
             out = model(x)
-            probs = torch.softmax(out, dim=1)
-            pred = (probs[:, 1] > 0.5).long() # Hattest du das extra so tief gesetzt?
-            correct += (pred == y).sum().item()
+            probs = torch.sigmoid(out)
+            preds = (probs > 0.5).long().view(-1)  # flatten preds
+            y = y.long().view(-1)                   # flatten y
+            correct += (preds == y).sum().item()
+
             y_true.extend(y.cpu().tolist())
-            y_pred.extend(pred.cpu().tolist())
+            y_pred.extend(preds.cpu().tolist())
 
     accuracy = correct / len(y_true)
     f1 = f1_score(y_true, y_pred, average='binary')
     return accuracy, y_true, y_pred, f1
+
 
 def train_modelold(model, train_loader, optimizer, loss_fn, device='cpu'):
     model.train()
