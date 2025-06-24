@@ -75,7 +75,7 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     
 
     
-    windows, timestamps = window_prediction(preprocessed_input, target_fs, window_size, step_size)
+    windows, timestamps = window_prediction(processed_input, target_fs, window_size, step_size)
     data_for_class = []
     # Feature extraction and brain map calculation
     for win in windows:
