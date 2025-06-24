@@ -17,27 +17,25 @@ class EEGWindowDataset(Dataset):
         self.samples = []
         for file in os.listdir(folder_path):
             if file.endswith(".pt"):
-                path = os.path.join(folder_path, file)
-                features, label, eeg_id, _ = torch.load(path)
-                self.samples.append((features, label, eeg_id))
+                samples = torch.load(os.path.join(folder_path, file))
+                self.samples.extend(samples)
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        features, label, eeg_id= self.samples[idx]  
-        
+        features, label, eeg_id, *_ = self.samples[idx]
         if isinstance(features, np.ndarray):
             features = torch.tensor(features, dtype=torch.float32)
-        if features.dim() == 2:
-            features = features.unsqueeze(0)  # channel dimension hinzufügen
         label = torch.tensor(label, dtype=torch.long)
         return features, label
 
     def get_labels_and_groups(self):
-        labels = [label for _, label, _ in self.samples]
-        groups = [eeg_id for _, _, eeg_id in self.samples]
+        labels = [label for _, label, *_ in self.samples]
+        groups = [eeg_id for _, _, eeg_id, *_ in self.samples]
         return labels, groups
+
+
 
 class DiceLoss(torch.nn.Module):
     def __init__(self, smooth=1e-6):
@@ -143,18 +141,18 @@ class EarlyStopping:
     
 def main():
 
-    ordner = "/home/jupyter-wki_team_3/wki-sose25/montage_datasets/"
+    ordner = "/home/jupyter-wki_team_3/wki-sose25/montage_datasets/combined/"
     unterordner = [f for f in os.listdir(ordner) if os.path.isdir(os.path.join(ordner, f)) and not f.startswith('.')]
     
     epochs = 50
-    batch_size = 128
+    batch_size = 512
     lr = 1e-4
     
     for config in unterordner:
         print(f"training auf {config}")
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        data_folder = "/home/jupyter-wki_team_3/wki-sose25/montage_datasets/" + config
+        data_folder = "/home/jupyter-wki_team_3/wki-sose25/montage_datasets/combined/" + config
         file_paths = sorted(glob(os.path.join(data_folder, "*.pt")))
     
         if not file_paths:
@@ -183,9 +181,9 @@ def main():
             print(f"========== FOLD {i} ==========")
 
             train_loader = DataLoader(Subset(dataset, train_idx), batch_size=batch_size, shuffle=True,
-                                      num_workers=8, pin_memory=True, persistent_workers=True)
+                                      num_workers=16, pin_memory=True, persistent_workers=True)
             val_loader = DataLoader(Subset(dataset, val_idx), batch_size=batch_size, shuffle=False,
-                                    num_workers=8, pin_memory=True)
+                                    num_workers=16, pin_memory=True)
 
             # Pos weight berechnen
             train_labels = [labels[idx] for idx in train_idx]

@@ -61,21 +61,17 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
 
     # Modell Aufsetzen
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    
-    model = torch.load(model_name, map_location=device)
-    model.to(device)
-    model.eval()
-    
+
     #Daten vorbereiten
     window_size = 4
     step_size = 1
     target_fs = 256
     original_fs = fs
-    processed_input = preprocess_signal_with_montages(channels, data, target_fs, original_fs)
+ 
     
-
+    montage_names, montage_data, montage_missing, target_fs = preprocess_signal_with_montages(channels, data, target_fs, original_fs)
     
-    windows, timestamps = window_prediction(processed_input, target_fs, window_size, step_size)
+    windows, timestamps = window_prediction(montage_data, target_fs, window_size, step_size)
     data_for_class = []
     # Feature extraction and brain map calculation
     for win in windows:
@@ -89,14 +85,14 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     predictions_per_window =[]
     with torch.no_grad():
         for feature_matr in data_for_class:
-            predicted_class = predictions_ensemble(feature_matr ,model_name, device)
-            predictions_per_window.append(predicted_class)
-    
+            prob = predictions_ensemble(feature_matr ,model_name, device)
+            y_pred = int(prob > 0.5)
+            predictions_per_window.append(y_pred)
+
     seizure_present = False
-    if 1 in predictions_per_window:
-        seizure_present = True
-        first_index = predictions_per_window.index(1)
-        onset = timestamps[first_index]
+    seizure_present, onset_candidate = detect_onset(predictions_per_window, timestamps, min_consecutive=2)
+    if seizure_present:
+        onset = onset_candidate
 
         
 #------------------------------------------------------------------------------  
@@ -108,18 +104,25 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
                                
                                
         
-def predictions_ensemble(feature,model_name,device):
-    
+def predictions_ensemble(features: torch.Tensor, model_name: str, device: torch.device) -> float:
     file_paths = sorted([os.path.join(model_name, f) for f in os.listdir(model_name) if f.endswith(".pth")])
 
-    probas = torch.zeros(2).to(device)  # 2 Klassen
+    probs = []
     with torch.no_grad():
         for path in file_paths:
-            model = torch.load(path, map_location=device)
+            model = CNN_EEG(6, 1).to(device)
+            model.load_state_dict(torch.load(path, map_location=device))
             model.eval()
-            output = model(feature)  # shape: [1, 2]
-            probas += torch.softmax(output.squeeze(), dim=0)  # → shape: [2]
+            features_new = features.unsqueeze(0).to(device)  # [1, feat_dim]
+            output = model(features_new)  # [1]
+            prob = torch.sigmoid(output.squeeze())  # scalar in [0, 1]
+            probs.append(prob.item())
 
-    prediction = probas / len(file_paths)  # shape: [2]
-    y_pred = (prediction[1] > 0.5).long()  # ← sicher!
-    return y_pred
+    return np.mean(probs)  # Ensemble-Mittelwert
+
+def detect_onset(predictions, timestamps, min_consecutive=2):
+    predictions = torch.tensor(predictions)
+    for i in range(len(predictions) - min_consecutive + 1):
+        if torch.all(predictions[i:i+min_consecutive] == 1):
+            return True, timestamps[i]
+    return False, None

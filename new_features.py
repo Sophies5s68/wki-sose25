@@ -46,6 +46,56 @@ def window_eeg_data(signal, resampled_fs, seizure_onset, seizure_offset, window_
 
     return windows, labels, timestamps
 
+# Windowing mit kleineren Windows während Anfällen um Samples für Anfälle zu steigern
+
+def window_eeg_data_variable(signal, resampled_fs, seizure_onset, seizure_offset, 
+                              normal_window_size, normal_step_size,
+                              seizure_window_size, seizure_step_size):
+    """
+    Fenster EEG-Daten mit variabler Fenstergröße: kleinere Fenster während Anfällen.
+
+    Returns:
+    - windows: Liste mit nparrays, mit der shape (n_channels, window_samples)
+    - labels: Liste mit 0 (kein Anfall) und 1 (Anfall)
+    - timestamps: Liste mit Zeiten von den Fenstern in Sekunden
+    """
+    if signal.ndim != 2: 
+        raise ValueError("Signal muss 2D sein, der Größe (n_channels, n_samples)")
+
+    n_channels, n_samples = signal.shape
+    windows, labels, timestamps = [], [], []
+
+    current_time = 0.0
+    while True:
+        # Entscheide, ob wir im Anfall sind oder nicht
+        if seizure_onset <= current_time <= seizure_offset:
+            window_size = seizure_window_size
+            step_size = seizure_step_size
+        else:
+            window_size = normal_window_size
+            step_size = normal_step_size
+
+        window_samples = int(window_size * resampled_fs)
+        step_samples = int(step_size * resampled_fs)
+        start = int(current_time * resampled_fs)
+        end = start + window_samples
+        
+        if end > n_samples:
+            break
+
+        window = signal[:, start:end]
+        windows.append(window)
+        timestamps.append(current_time)
+
+        # Setze Label
+        if (current_time + window_size) >= seizure_onset and current_time <= seizure_offset:
+            labels.append(1)
+        else:
+            labels.append(0)
+
+        current_time += step_size
+
+    return windows, labels, timestamps
 
 def get_band_indices(f):
     return {band: np.logical_and(f >= fmin, f <= fmax) for band, (fmin, fmax) in bands.items()}

@@ -3,35 +3,35 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.metrics import f1_score
 
-class CNN_EEG(nn.Module):
+class CNN_EEG_flat(nn.Module):
     def __init__(self, in_channels, n_classes):
-        super(CNN_EEG, self).__init__()
+        super(CNN_EEG_flat, self).__init__()
         
         self.conv1 = nn.Conv1d(in_channels, out_channels = 64, kernel_size = 3, padding =1)
         self.bn1 = nn.BatchNorm1d(64) # mal ausprobieren
         self.pool1 = nn.MaxPool1d(kernel_size=2)
-        self.dropout1 = nn.Dropout1d(0.25)
+        self.dropout1 = nn.Dropout1d(0.5)
         
         self.conv2 = nn.Conv1d(64, out_channels= 128, kernel_size = 3, padding =1)
         self.bn2 = nn.BatchNorm1d(128)
         self.pool2 = nn.MaxPool1d(kernel_size=2)
-        self.dropout2 = nn.Dropout1d(0.25)
+        self.dropout2 = nn.Dropout1d(0.5)
         
         flattened_size = self._get_flattened_size(in_channels) # Eingangsgröße muss angepasst werden
         self.classifier = nn.Sequential(
-            nn.Linear(flattened_size, 512),
+            nn.Linear(flattened_size, 128),
             nn.ReLU(),
             nn.Dropout(0.5),
-            nn.Linear(512, 128),
+            nn.Linear(128, 64),
             nn.ReLU(),
             nn.Dropout(0.3),
-            nn.Linear(128, n_classes)
+            nn.Linear(64, n_classes)
         )
 
     
     def _get_flattened_size(self, in_channels):
         with torch.no_grad():
-            x = torch.zeros(1, in_channels, 15)  # Anzahl aller features
+            x = torch.zeros(1, in_channels, 10)  # Anzahl der spectral features
             x = self.pool1(F.relu(self.conv1(x)))
             x = self.pool2(F.relu(self.conv2(x)))
         return x.view(1, -1).shape[1]
@@ -65,7 +65,7 @@ def train_model(model, train_loader, optimizer, loss_fn, device='cpu'):
                 print("Minimum:", probs.min().item(), "Maximum:", probs.max().item())
                 raise ValueError("Ungültige Werte im Modell-Output")
 
-            loss = loss_fn(logits, y)  # Dice Loss erwartet Wahrscheinlichkeiten und Float-Labels
+            loss = loss_fn(probs, y)  # Dice Loss erwartet Wahrscheinlichkeiten und Float-Labels
             loss.backward()
 
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
