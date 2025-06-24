@@ -42,7 +42,7 @@ def bandpass_filter_iir_filtfilt(sig, fs, lowcut=1.0, highcut=120.0, order=4):
     else:
         raise ValueError("Signal must be 1D or 2D.")
 
-def preprocess_signal_with_montages(channels, data, target_fs, original_fs, ids):
+def preprocess_signal_with_montages(channels, data, target_fs, original_fs, ids=0):
     # Holt die 6 Montagen aus dem Datensatz
     montage_names, montage_data, montage_missing = get_6montages(channels, data)
     # Signale werden durch einen Notch Filter gefiltert

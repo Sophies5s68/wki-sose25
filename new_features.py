@@ -104,3 +104,25 @@ def feature_extraction_window(signals, fs):
 
     return standardize_matrix(np.asarray(feature_matr))
 
+
+def window_predicition(signal, resampled_fs, window_size, step_size):
+
+    # Testet, ob Input in der richtigen Form ist 
+    if signal.ndim !=2: 
+        raise ValueError("Signal muss 2D sein, der Größe (n_channels, n_samples)")
+    window_samples = int(window_size * resampled_fs)
+    step_samples = int(step_size * resampled_fs)
+    n_channels, n_samples = signal.shape
+    
+    windows = []
+    timestamps = []
+    
+    for start in range(0, n_samples - window_samples + 1, step_samples):
+        end = start + window_samples
+        window = signal[:, start:end]
+        windows.append(window)
+        start_sec = start / resampled_fs
+        end_sec = end / resampled_fs
+        timestamps.append(start_sec)
+
+    return windows, timestamps
