@@ -105,7 +105,7 @@ def feature_extraction_window(signals, fs):
     return standardize_matrix(np.asarray(feature_matr))
 
 
-def window_predicition(signal, resampled_fs, window_size, step_size):
+def window_prediction(signal, resampled_fs, window_size, step_size):
 
     # Testet, ob Input in der richtigen Form ist 
     if signal.ndim !=2: 
