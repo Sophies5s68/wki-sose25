@@ -95,8 +95,8 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     seizure_present = False
     if 1 in predictions_per_window:
         seizure_present = True
-        timestamps[
-        onset = time_first
+        first_index = predictions_per_window.index(1)
+        onset = timestamps[first_index]
 
         
 #------------------------------------------------------------------------------  
