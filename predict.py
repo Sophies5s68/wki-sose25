@@ -61,16 +61,16 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
 
     # Modell Aufsetzen
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-    '''
+    
     model = torch.load(model_name, map_location=device)
     model.to(device)
     model.eval()
-    '''
+    
     #Daten vorbereiten
     window_size = 4
     step_size = 1
     target_fs = 256
-    orgiginal_fs = fs
+    original_fs = fs
     processed_input = preprocess_signal_with_montages(channels, data, target_fs, original_fs)
     
 
