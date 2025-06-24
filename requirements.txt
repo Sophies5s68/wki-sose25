@@ -9,3 +9,4 @@ joblib>=1.2
 torch
 pyprep
 scikit-learn
+antropy
