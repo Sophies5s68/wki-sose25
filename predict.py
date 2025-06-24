@@ -23,7 +23,7 @@ import torch.nn as nn
 from CNN_model import CNN_EEG
 from new_preprocess import preprocess_signal_with_montages
 from new_features import window_prediction, feature_extraction_window
-from CNN_dataset import window_data_evaluate, create_fixed_grid_maps
+#from CNN_dataset import window_data_evaluate, create_fixed_grid_maps
 from glob import glob
 
 ###Signatur der Methode (Parameter und Anzahl return-Werte) darf nicht verändert werden
