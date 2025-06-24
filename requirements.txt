@@ -8,3 +8,4 @@ mysql-connector-python>=8.0.26
 joblib>=1.2
 torch
 pyprep
+sklearn
