@@ -65,6 +65,8 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 
     #Daten vorbereiten
+    stft_window_size = 2
+    stft_overlap = 0.5
     window_size = 4
     step_size = 1
     target_fs = 256

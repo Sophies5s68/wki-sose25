@@ -138,7 +138,7 @@ def standardize_matrix(matr):
     std[std == 0] = 1
     return (matr - mean) / std
 
-def feature_extraction_window(signals, fs, stft_window_size= 1, stft_overlap = 0.5):
+def feature_extraction_window(signals, fs, stft_window_size, stft_overlap):
     n_channels, n_samples = signals.shape
     nperseg = int(stft_window_size * fs)
     noverlap = int(nperseg * stft_overlap)
