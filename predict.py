@@ -16,7 +16,7 @@ from wettbewerb import get_6montages
 
 # Pakete aus dem Vorlesungsbeispiel
 import mne
-from scipy import signal as sig
+from scipy import signal as sps
 import ruptures as rpt
 import torch 
 import torch.nn as nn
@@ -25,7 +25,7 @@ from new_preprocess import preprocess_signal_with_montages
 from features_prediction import window_prediction, feature_extraction_window
 #from CNN_dataset import window_data_evaluate, create_fixed_grid_maps
 from glob import glob
-from scipy.signal import iirnotch, butter, sosfiltfilt, resample_poly,tf2sos
+from scipy.signal import iirnotch, butter, sosfiltfilt, resample_poly, tf2sos
 
 
 ###Signatur der Methode (Parameter und Anzahl return-Werte) darf nicht verändert werden
@@ -151,4 +151,4 @@ def resample_signal(signal, original_fs, target_fs=256):
     gcd = np.gcd(int(original_fs), int(target_fs))
     up = int(target_fs // gcd)
     down = int(original_fs // gcd)
-    return resample_poly(sig, up, down, axis=-1)
+    return resample_poly(signal, up, down, axis=-1)
