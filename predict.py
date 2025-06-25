@@ -71,12 +71,12 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     original_fs = fs
  
     
-    montage_names, montage_data, montage_missing = get_6montages(channels, data)
+    montage_names, montage_data, montage_missing,target_fs = preprocess_signal_with_montages(channels, data,target_fs,original_fs)
     notch_data = notch_filter(montage_data,original_fs)
     band_data = bandpass_filter(notch_data, original_fs)
   
     
-    windows, timestamps = window_prediction(band_data, target_fs, window_size, step_size)
+    windows, timestamps = window_prediction(montage_data, target_fs, window_size, step_size)
     data_for_class = []
     # Feature extraction and brain map calculation
     for win in windows:
