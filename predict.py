@@ -71,10 +71,7 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     original_fs = fs
  
     
-    montage_names, montage_data, montage_missing,target_fs = preprocess_signal_with_montages(channels, data,target_fs,original_fs)
-    notch_data = notch_filter(montage_data,original_fs)
-    band_data = bandpass_filter(notch_data, original_fs)
-  
+    montage_names, montage_data, montage_missing,target_fs = preprocess_signal_with_montages(channels, data,target_fs,original_fs) 
     
     windows, timestamps = window_prediction(montage_data, target_fs, window_size, step_size)
     data_for_class = []
@@ -89,10 +86,8 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     # Klassifikation
     predictions_per_window =[]
     with torch.no_grad():
-        for feature_matr in data_for_class:
-            prob = predictions_ensemble(feature_matr ,model_name, device)
-            y_pred = int(prob > 0.5)
-            predictions_per_window.append(y_pred)
+        probs = predictions_ensemble(data_for_class ,model_name, device)
+        predictions_per_window = [int(p > 0.5) for p in probs]
 
     seizure_present = False
     seizure_present, onset_candidate = detect_onset(predictions_per_window, timestamps, min_consecutive=2)
@@ -109,21 +104,22 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
                                
                                
         
-def predictions_ensemble(features: torch.Tensor, model_name: str, device: torch.device) -> float:
+def predictions_ensemble(data_for_class: List[torch.Tensor], model_name: str, device: torch.device) -> List[float]:
     file_paths = sorted([os.path.join(model_name, f) for f in os.listdir(model_name) if f.endswith(".pth")])
-
+    batch_tensor = torch.stack(data_for_class).to(device)
     probs = []
+
     with torch.no_grad():
         for path in file_paths:
             model = CNN_EEG(6, 1).to(device)
             model.load_state_dict(torch.load(path, map_location=device))
             model.eval()
-            features_new = features.unsqueeze(0).to(device)  # [1, feat_dim]
-            output = model(features_new)  # [1]
-            prob = torch.sigmoid(output.squeeze())  # scalar in [0, 1]
-            probs.append(prob.item())
+            outputs = torch.sigmoid(model(batch_tensor).squeeze())
+            probs.append(outputs.cpu().numpy())  # shape: (num_windows,)
 
-    return np.mean(probs)  # Ensemble-Mittelwert
+    ensemble_probs = np.mean(probs, axis=0)  # Mittelwert pro Fenster
+    return ensemble_probs.tolist()  # Gib Liste von Wahrscheinlichkeiten zurück
+
 
 def detect_onset(predictions, timestamps, min_consecutive=2):
     predictions = torch.tensor(predictions)

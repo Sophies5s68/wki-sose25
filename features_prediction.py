@@ -75,38 +75,30 @@ def window_prediction(signal, resampled_fs, window_size, step_size):
 
     return windows, timestamps
 
+from joblib import Parallel, delayed
+
 def feature_extraction_window(signals, fs):
     signals = np.nan_to_num(signals, nan=0.0, posinf=0.0, neginf=0.0)
     signals = signals.astype(np.float32)
-    n_channels, n_samples = signals.shape
-    nperseg = n_samples  # Volle Länge des Windows
-
-    # STFT berechnen
-    f, t, Zxx = sps.stft(signals, fs=fs, nperseg=nperseg, noverlap=0, axis=-1, boundary=None)
-    spectrum = np.abs(Zxx) ** 2  # Power Spectrum (n_channels, freq_bins, time_frames)
-    spectrum[np.isnan(spectrum)] = 0.0   # NaNs durch 0 ersetzen
-    spectrum[np.isinf(spectrum)] = 0.0
-    spectrum_mean = np.nanmean(spectrum, axis=-1)  # Mittelung über Zeitachse → (n_channels, freq_bins)
-
+    f, spectrum = compute_power_spectrum(signals, fs)
     idx_dict = get_band_indices(f)
 
-    # Features pro Kanal berechnen
-    feature_list = []
-    for ch in range(n_channels):
-        band_power = spectral_power(spectrum_mean[ch], idx_dict)
-        mean_amp = mean_spectral_amplitude(spectrum_mean[ch], idx_dict)
-
+    def process_channel(ch):
+        band_power = spectral_power(spectrum[ch], idx_dict)
+        mean_amp = mean_spectral_amplitude(spectrum[ch], idx_dict)
         activity, mobility, complexity = hjorthparameters(signals[ch])
-        hjorth = [activity, mobility, complexity]
-
-        spec_ent = spectral_entropy(f, spectrum_mean[ch])
+        spec_ent = spectral_entropy(f, spectrum[ch])
         pfd = petrosian_fd(signals[ch])
+        return band_power + mean_amp + [activity, mobility, complexity, spec_ent, pfd]
 
-        all_feats = band_power + mean_amp + hjorth + [spec_ent, pfd]
-        feature_list.append(all_feats)
+    features = Parallel(n_jobs=-1)(delayed(process_channel)(ch) for ch in range(signals.shape[0]))
+    return standardize_matrix(np.array(features))
 
 
-    features = np.array(feature_list)  # Shape: (n_channels, n_features)
-    return standardize_matrix(features)
-
+def compute_power_spectrum(signal, fs):
+    # signal: (n_channels, n_samples)
+    fft_vals = np.fft.rfft(signal, axis=-1)
+    spectrum = np.abs(fft_vals) ** 2
+    freqs = np.fft.rfftfreq(signal.shape[1], d=1/fs)
+    return freqs, spectrum
 
