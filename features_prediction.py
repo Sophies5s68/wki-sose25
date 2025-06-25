@@ -72,27 +72,34 @@ def window_prediction(signal, resampled_fs, window_size, step_size):
     return windows, timestamps
 
 def feature_extraction_window(signals, fs):
-    
     signals = signals.astype(np.float32)
     n_channels, n_samples = signals.shape
-    nperseg = n_samples
+    nperseg = n_samples  # Volle Länge des Windows
 
-    # Berechne STFT über alle Kanäle
+    # STFT berechnen
     f, t, Zxx = sps.stft(signals, fs=fs, nperseg=nperseg, noverlap=0, axis=-1, boundary=None)
-    spectrum = np.abs(Zxx) ** 2  # Power Spectrum
-    spectrum_mean = np.mean(spectrum, axis=-1)  # Mittelwert über die Zeitachse (1 Frame bei 1 Window)
+    spectrum = np.abs(Zxx) ** 2  # Power Spectrum (n_channels, freq_bins, time_frames)
+    spectrum_mean = np.mean(spectrum, axis=-1)  # Mittelung über Zeitachse → (n_channels, freq_bins)
 
     idx_dict = get_band_indices(f)
 
-    # Vektorisierte Features
-    spectral_pwr = spectral_power_v(spectrum_mean, idx_dict)
-    mean_amp = mean_spectral_amplitude_v(spectrum_mean, idx_dict)
-    hjorth = hjorth_parameters_v(signals)
+    # Features pro Kanal berechnen
+    feature_list = []
+    for ch in range(n_channels):
+        band_power = spectral_power(spectrum_mean[ch], idx_dict)
+        mean_amp = mean_spectral_amplitude(spectrum_mean[ch], idx_dict)
 
-    # Nicht vektorisierbare Features parallel
-    extra_feats = additional_features_parallel(signals, f, spectrum_mean)
+        activity, mobility, complexity = hjorthparameters(signals[ch])
+        hjorth = [activity, mobility, complexity]
 
-    # Features kombinieren
-    features = np.concatenate([spectral_pwr, mean_amp, hjorth, extra_feats], axis=1)
+        spec_ent = spectral_entropy(f, spectrum_mean[ch])
+        pfd = petrosian_fd(signals[ch])
+
+        all_feats = band_power + mean_amp + hjorth + [spec_ent, pfd]
+        feature_list.append(all_feats)
+
+
+    features = np.array(feature_list)  # Shape: (n_channels, n_features)
     return standardize_matrix(features)
+
 
