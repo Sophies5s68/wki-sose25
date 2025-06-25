@@ -79,7 +79,7 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     data_for_class = []
     # Feature extraction and brain map calculation
     for win in windows:
-        features = feature_extraction_window(win, fs) # shape: (n_channels, n_features)
+        features = feature_extraction_window(win, fs, stft_window_size, stft_overlap) # shape: (n_channels, n_features)
         assert not np.isnan(features).any(), "NaN in features!"
         x = torch.tensor(features, dtype = torch.float)
         data_for_class.append(x)
