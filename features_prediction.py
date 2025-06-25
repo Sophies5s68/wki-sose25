@@ -21,7 +21,10 @@ def mean_spectral_amplitude(spectrum, idx_dict):
     return [np.nanmean(amp[idx]) if amp[idx].size > 0 else 0.0 for idx in idx_dict.values()]
 
 def spectral_entropy(f, spectrum, base=np.e):
-    psd_norm = spectrum / np.sum(spectrum)
+    total_power = np.sum(spectrum)
+    if total_power < 1e-12:
+        return 0.0
+    psd_norm = spectrum / total_power
     psd_norm = np.clip(psd_norm, 1e-12, 1)
     log_fn = np.log if base == np.e else np.log2
     entropy_val = -np.sum(psd_norm * log_fn(psd_norm))
@@ -43,6 +46,7 @@ def petrosian_fd(sig):
     return np.log10(N) / (np.log10(N) + np.log10(N / (N + 0.4 * N_delta))) if N_delta != 0 else 0.0
 
 def standardize_matrix(matr):
+    matr = np.nan_to_num(matr, nan=0.0, posinf=0.0, neginf=0.0)
     mean = matr.mean(axis=0)
     std = matr.std(axis=0)
     std[std == 0] = 1
@@ -72,6 +76,7 @@ def window_prediction(signal, resampled_fs, window_size, step_size):
     return windows, timestamps
 
 def feature_extraction_window(signals, fs):
+    signals = np.nan_to_num(signals, nan=0.0, posinf=0.0, neginf=0.0)
     signals = signals.astype(np.float32)
     n_channels, n_samples = signals.shape
     nperseg = n_samples  # Volle Länge des Windows
@@ -79,7 +84,9 @@ def feature_extraction_window(signals, fs):
     # STFT berechnen
     f, t, Zxx = sps.stft(signals, fs=fs, nperseg=nperseg, noverlap=0, axis=-1, boundary=None)
     spectrum = np.abs(Zxx) ** 2  # Power Spectrum (n_channels, freq_bins, time_frames)
-    spectrum_mean = np.mean(spectrum, axis=-1)  # Mittelung über Zeitachse → (n_channels, freq_bins)
+    spectrum[np.isnan(spectrum)] = 0.0   # NaNs durch 0 ersetzen
+    spectrum[np.isinf(spectrum)] = 0.0
+    spectrum_mean = np.nanmean(spectrum, axis=-1)  # Mittelung über Zeitachse → (n_channels, freq_bins)
 
     idx_dict = get_band_indices(f)
 
