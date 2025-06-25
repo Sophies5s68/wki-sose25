@@ -12,7 +12,7 @@ import numpy as np
 import json
 import os
 from typing import List, Tuple, Dict, Any
-from wettbewerb import get_3montages
+from wettbewerb import get_6montages
 
 # Pakete aus dem Vorlesungsbeispiel
 import mne
@@ -20,11 +20,13 @@ from scipy import signal as sig
 import ruptures as rpt
 import torch 
 import torch.nn as nn
-from CNN_model import CNN_EEG
+from CNN_model_copy import CNN_EEG
 from new_preprocess import preprocess_signal_with_montages
 from new_features import window_prediction, feature_extraction_window
 #from CNN_dataset import window_data_evaluate, create_fixed_grid_maps
 from glob import glob
+from scipy.signal import iirnotch, butter, sosfiltfilt, resample_poly,tf2sos
+
 
 ###Signatur der Methode (Parameter und Anzahl return-Werte) darf nicht verändert werden
 def predict_labels(channels : List[str], data : np.ndarray, fs : float, reference_system: str, model_name : str='model.json') -> Dict[str,Any]:
@@ -69,9 +71,12 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     original_fs = fs
  
     
-    montage_names, montage_data, montage_missing, target_fs = preprocess_signal_with_montages(channels, data, target_fs, original_fs)
+    montage_names, montage_data, montage_missing = get_6montages(channels, data)
+    notch_data = notch_filter(montage_data,original_fs)
+    band_data = bandpass_filter(notch_data, original_fs)
+  
     
-    windows, timestamps = window_prediction(montage_data, target_fs, window_size, step_size)
+    windows, timestamps = window_prediction(band_data, target_fs, window_size, step_size)
     data_for_class = []
     # Feature extraction and brain map calculation
     for win in windows:
@@ -126,3 +131,24 @@ def detect_onset(predictions, timestamps, min_consecutive=2):
         if torch.all(predictions[i:i+min_consecutive] == 1):
             return True, timestamps[i]
     return False, None
+
+
+
+def notch_filter(signal, fs, freq=50.0, Q=30.0):
+    w0 = freq / (fs / 2)
+    b, a = iirnotch(w0, Q)
+    sos = tf2sos(b, a)  # Transferfunktion → SOS
+    return sosfiltfilt(sos, signal, axis=-1)
+
+
+def bandpass_filter(signal, fs, lowcut=1.0, highcut=120.0, order=4):
+    sos = sig.butter(order, [lowcut, highcut], btype='band', fs=fs, output='sos')
+    return sosfiltfilt(sos, signal, axis=-1)
+
+def resample_signal(signal, original_fs, target_fs=256):
+    if original_fs == target_fs:
+        return signal
+    gcd = np.gcd(int(original_fs), int(target_fs))
+    up = int(target_fs // gcd)
+    down = int(original_fs // gcd)
+    return resample_poly(sig, up, down, axis=-1)

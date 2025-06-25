@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import StratifiedGroupKFold
-from CNN_Model_flat import CNN_EEG_flat, train_model, evaluate_model  # Stelle sicher, dass du die Klasse separat speicherst
+from CNN_model import CNN_EEG, train_model, evaluate_model  # Stelle sicher, dass du die Klasse separat speicherst
 import numpy as np
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
@@ -12,8 +12,51 @@ from glob import glob
 from sklearn.utils.class_weight import compute_class_weight
 from collections import Counter
 
-#kleine Veränderung bei EEGDataset, da jetzt mehrere Daten in einer .pt Datei zusammengefasst, beschleunigt den Ladeprozess
+#kleine Veränderung bei EEGWDataset, da jetzt mehrere Daten in einer .pt Datei zusammengefasst, beschleunigt den Ladeprozess
 
+class EEGWindowDatasetLazy(torch.utils.data.Dataset):
+    def __init__(self, folder_path):
+        self.file_paths = []
+        self.index = []  # List of tuples: (file_id, sample_idx, label, eeg_id)
+        for file in sorted(os.listdir(folder_path)):
+            if file.endswith(".pt"):
+                full_path = os.path.join(folder_path, file)
+                file_id = len(self.file_paths)
+                self.file_paths.append(full_path)
+
+                # Nur Metadaten aus Datei lesen (Sample-Struktur anpassen falls nötig)
+                samples_meta = torch.load(full_path, map_location='cpu')
+                for i, sample in enumerate(samples_meta):
+                    _, label, eeg_id, *_ = sample
+                    self.index.append((file_id, i, label, eeg_id))
+
+        # Cache-Dictionary, key=file_id, value=geladene Daten (Tensor-Liste)
+        self.cache = {}
+
+    def __len__(self):
+        return len(self.index)
+
+    def __getitem__(self, idx):
+        file_id, sample_idx, _, _ = self.index[idx]
+
+        # Prüfe, ob Datei im Cache ist, sonst laden und cachen
+        if file_id not in self.cache:
+            self.cache[file_id] = torch.load(self.file_paths[file_id], map_location='cpu')
+
+        samples = self.cache[file_id]
+        features, label, *_ = samples[sample_idx]
+
+        if isinstance(features, np.ndarray):
+            features = torch.tensor(features, dtype=torch.float32)
+        label = torch.tensor(label, dtype=torch.long)
+
+        return features, label
+
+    def get_labels_and_groups(self):
+        labels = [label for _, _, label, _ in self.index]
+        groups = [eeg_id for _, _, _, eeg_id in self.index]
+        return labels, groups
+    
 class EEGWindowDatasetCombined(torch.utils.data.Dataset):
     def __init__(self, folder_path):
         self.samples = []
@@ -29,8 +72,6 @@ class EEGWindowDatasetCombined(torch.utils.data.Dataset):
         features, label, eeg_id, *_ = self.samples[idx]
         if isinstance(features, np.ndarray):
             features = torch.tensor(features, dtype=torch.float32)
-        #if features.dim() == 2:
-            #features = features.unsqueeze(0)
         label = torch.tensor(label, dtype=torch.long)
         return features, label
 
@@ -38,9 +79,40 @@ class EEGWindowDatasetCombined(torch.utils.data.Dataset):
         labels = [label for _, label, *_ in self.samples]
         groups = [eeg_id for _, _, eeg_id, *_ in self.samples]
         return labels, groups
+    
+class EEGWindowDatasetSingleFiles(torch.utils.data.Dataset):
+    def __init__(self, folder_path):
+        self.file_paths = []
+        for file in os.listdir(folder_path):
+            if file.endswith(".pt"):
+                self.file_paths.append(os.path.join(folder_path, file))
+        self.file_paths.sort()  # Optional, damit Reihenfolge fix ist
 
+    def __len__(self):
+        return len(self.file_paths)
 
+    def __getitem__(self, idx):
+        file_path = self.file_paths[idx]
+        sample = torch.load(file_path, map_location='cpu')  # Nur eine Datei laden
+        features, label, eeg_id, *rest = sample
 
+        if isinstance(features, np.ndarray):
+            features = torch.tensor(features, dtype=torch.float32)
+        label = torch.tensor(label, dtype=torch.long)
+
+        return features, label
+
+    def get_labels_and_groups(self):
+        labels = []
+        groups = []
+        for file_path in self.file_paths:
+            sample = torch.load(file_path, map_location='cpu')
+            _, label, eeg_id, *rest = sample
+            labels.append(label)
+            groups.append(eeg_id)
+        return labels, groups
+
+    
 class DiceLoss(torch.nn.Module):
     def __init__(self, smooth=1e-6):
         super().__init__()
@@ -142,20 +214,29 @@ class EarlyStopping:
             self.best_score = score
             self.best_model_state = model.state_dict()
             self.counter = 0
+            
+class SubsetDataset(Dataset):
+    def __init__(self, base_dataset, indices):
+        self.base_dataset = base_dataset
+        self.indices = indices
 
+    def __len__(self):
+        return len(self.indices)
+
+    def __getitem__(self, idx):
+        return self.base_dataset[self.indices[idx]]
             
 def main():
-   
-    data_folder = "data_features_sep/spectral/win4_step1_combined" 
-    run_name = "spectral_relu"  
+    data_folder = "montage_datasets/spectral_only/win4_step1" 
+    run_name = "spectral_512"  
 
     epochs = 50
-    batch_size = 128
+    batch_size = 512
     lr = 1e-4
 
     print(f"Training von {run_name}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-
+    print(f"training on {device}")
     file_paths = sorted(glob(os.path.join(data_folder, "*.pt")))
     if not file_paths:
         print(f"[WARNUNG] Keine .pt-Dateien in {data_folder} gefunden – Abbruch.")
@@ -165,6 +246,7 @@ def main():
     labels, groups = dataset.get_labels_and_groups()
     torch.backends.cudnn.benchmark = True
     print("loaded")
+
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
 
     all_confusion_matrices = []
@@ -178,27 +260,26 @@ def main():
         print(f"========== FOLD {i} ==========")
 
         train_loader = DataLoader(Subset(dataset, train_idx), batch_size=batch_size, shuffle=True,
-                                  num_workers=8, pin_memory=True, persistent_workers=True)
+                                  num_workers=16, pin_memory=True, persistent_workers=True)
         val_loader = DataLoader(Subset(dataset, val_idx), batch_size=batch_size, shuffle=False,
-                                num_workers=8, pin_memory=True)
+                                num_workers=16, pin_memory=True)
 
-        # Pos Weight für Loss
         train_labels = [labels[idx] for idx in train_idx]
         counter = Counter(train_labels)
         neg, pos = counter[0], counter[1]
         pos_weight = neg / pos
         pos_weight_tensor = torch.tensor([pos_weight], dtype=torch.float32).to(device)
-        print(dataset[0][0].shape[0])
 
-        model = CNN_EEG_flat(in_channels=dataset[0][0].shape[0], n_classes=1).to(device)
+        model = CNN_EEG(in_channels=dataset[0][0].shape[0], n_classes=1).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         loss_fn = CombinedLoss(pos_weight=pos_weight_tensor, alpha_dice=0.7, alpha_focal=0.3) 
+
+        early_stopper = EarlyStopping(patience=5, verbose=True)
+
         fold_train_losses = []
         fold_train_accuracies = []
         fold_test_accuracies = []
         fold_f1 = []
-
-        early_stopper = EarlyStopping(patience=5, verbose=True)
 
         for epoch in range(epochs):
             train_loss, train_acc = train_model(model, train_loader, optimizer, loss_fn, device)
