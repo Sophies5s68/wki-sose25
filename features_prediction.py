@@ -8,6 +8,47 @@ from antropy import perm_entropy
 bands = {'delta': [1, 4], 'theta': [4, 8], 'alpha': [8, 14],
          'beta': [14, 30], 'gamma': [30, 120]}
 
+def get_band_indices(f):
+    return {band: np.logical_and(f >= fmin, f <= fmax) for band, (fmin, fmax) in bands.items()}
+
+# Berechne die Power pro Band
+def spectral_power(spectrum, idx_dict):
+    return [np.nanmean(spectrum[idx]) if spectrum[idx].size > 0 else 0.0 for idx in idx_dict.values()]
+
+def mean_spectral_amplitude(spectrum, idx_dict):
+    spectrum_clipped = np.clip(spectrum, 0, None)
+    amp = np.sqrt(spectrum_clipped)
+    return [np.nanmean(amp[idx]) if amp[idx].size > 0 else 0.0 for idx in idx_dict.values()]
+
+def spectral_entropy(f, spectrum, base=np.e):
+    psd_norm = spectrum / np.sum(spectrum)
+    psd_norm = np.clip(psd_norm, 1e-12, 1)
+    log_fn = np.log if base == np.e else np.log2
+    entropy_val = -np.sum(psd_norm * log_fn(psd_norm))
+    return entropy_val / log_fn(len(psd_norm))
+
+def hjorthparameters(sig):
+    sig = np.asarray(sig)
+    first_deriv = np.diff(sig)
+    second_deriv = np.diff(first_deriv)
+    activity = np.var(sig)
+    mobility = np.sqrt(np.var(first_deriv) / (activity + 1e-10))
+    complexity = np.sqrt(np.var(second_deriv) / (np.var(first_deriv) + 1e-10)) / (mobility + 1e-10)
+    return activity, mobility, complexity
+
+def petrosian_fd(sig):
+    N = len(sig)
+    diff = np.diff(sig)
+    N_delta = np.sum(diff[1:] * diff[:-1] < 0)
+    return np.log10(N) / (np.log10(N) + np.log10(N / (N + 0.4 * N_delta))) if N_delta != 0 else 0.0
+
+def standardize_matrix(matr):
+    mean = matr.mean(axis=0)
+    std = matr.std(axis=0)
+    std[std == 0] = 1
+    return (matr - mean) / std
+
+
 def window_prediction(signal, resampled_fs, window_size, step_size):
 
     # Testet, ob Input in der richtigen Form ist 
@@ -30,62 +71,28 @@ def window_prediction(signal, resampled_fs, window_size, step_size):
 
     return windows, timestamps
 
-def get_band_indices(f):
-    return {band: np.logical_and(f >= fmin, f <= fmax) for band, (fmin, fmax) in bands.items()}
-
-def spectral_power_v(spectrum, idx_dict):
-    return np.stack([np.nanmean(spectrum[:, idx], axis=1) for idx in idx_dict.values()], axis=1)
-
-def mean_spectral_amplitude_v(spectrum, idx_dict):
-    amp = np.sqrt(np.clip(spectrum, 0, None))
-    return np.stack([np.nanmean(amp[:, idx], axis=1) for idx in idx_dict.values()], axis=1)
-
-def hjorth_parameters_v(sig):
-    diff1 = np.diff(sig, axis=1)
-    diff2 = np.diff(diff1, axis=1)
-    activity = np.var(sig, axis=1)
-    mobility = np.sqrt(np.var(diff1, axis=1) / (activity + 1e-10))
-    complexity = np.sqrt(np.var(diff2, axis=1) / (np.var(diff1, axis=1) + 1e-10)) / (mobility + 1e-10)
-    return np.stack([activity, mobility, complexity], axis=1)
-
-def spectral_entropy_channel(f, spectrum_ch, base=np.e):
-    psd_norm = spectrum_ch / np.sum(spectrum_ch)
-    psd_norm = np.clip(psd_norm, 1e-12, 1)
-    log_fn = np.log if base == np.e else np.log2
-    return -np.sum(psd_norm * log_fn(psd_norm)) / log_fn(len(psd_norm))
-
-def petrosian_fd(sig):
-    N = len(sig)
-    diff = np.diff(sig)
-    N_delta = np.sum(diff[1:] * diff[:-1] < 0)
-    return np.log10(N) / (np.log10(N) + np.log10(N / (N + 0.4 * N_delta))) if N_delta != 0 else 0.0
-
-def additional_features_parallel(signals, f, spectrum):
-    def compute(ch_idx):
-        spec_ent = spectral_entropy_channel(f, spectrum[ch_idx])
-        pfd = petrosian_fd(signals[ch_idx])
-        return [spec_ent, pfd]
-    return np.array(Parallel(n_jobs=-1)(delayed(compute)(i) for i in range(signals.shape[0])))
-
-def standardize_matrix(matr):
-    mean = matr.mean(axis=0)
-    std = matr.std(axis=0)
-    std[std == 0] = 1
-    return (matr - mean) / std
-
 def feature_extraction_window(signals, fs):
-    # Welch auf allen Kanälen
-    f, spectrum = sps.welch(signals, fs, axis=-1)
+    
+    signals = signals.astype(np.float32)
+    n_channels, n_samples = signals.shape
+    nperseg = n_samples
+
+    # Berechne STFT über alle Kanäle
+    f, t, Zxx = sps.stft(signals, fs=fs, nperseg=nperseg, noverlap=0, axis=-1, boundary=None)
+    spectrum = np.abs(Zxx) ** 2  # Power Spectrum
+    spectrum_mean = np.mean(spectrum, axis=-1)  # Mittelwert über die Zeitachse (1 Frame bei 1 Window)
+
     idx_dict = get_band_indices(f)
 
-    # Features vektorisieren
-    spectral_pwr = spectral_power_v(spectrum, idx_dict)
-    mean_amp = mean_spectral_amplitude_v(spectrum, idx_dict)
+    # Vektorisierte Features
+    spectral_pwr = spectral_power_v(spectrum_mean, idx_dict)
+    mean_amp = mean_spectral_amplitude_v(spectrum_mean, idx_dict)
     hjorth = hjorth_parameters_v(signals)
 
-    # Nicht vektorisierbare Features parallelisieren
-    extra_feats = additional_features_parallel(signals, f, spectrum)
+    # Nicht vektorisierbare Features parallel
+    extra_feats = additional_features_parallel(signals, f, spectrum_mean)
 
-    # Alles zusammenführen
+    # Features kombinieren
     features = np.concatenate([spectral_pwr, mean_amp, hjorth, extra_feats], axis=1)
     return standardize_matrix(features)
+
