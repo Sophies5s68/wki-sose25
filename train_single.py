@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import StratifiedGroupKFold
-from CNN_model import CNN_EEG, train_model, evaluate_model  # Stelle sicher, dass du die Klasse separat speicherst
+from CNN_model_copy import CNN_EEG, train_model, evaluate_model  # Stelle sicher, dass du die Klasse separat speicherst
 import numpy as np
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
@@ -227,11 +227,11 @@ class SubsetDataset(Dataset):
         return self.base_dataset[self.indices[idx]]
             
 def main():
-    data_folder = "montage_datasets/win4_step1_combined/" 
-    run_name = "batch_1024"  
+    data_folder = "montage_datasets/combined/win4_step1/" 
+    run_name = "test"  
 
     epochs = 50
-    batch_size = 1024
+    batch_size = 512
     lr = 1e-4
 
     print(f"Training von {run_name}")

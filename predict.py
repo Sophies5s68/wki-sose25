@@ -142,7 +142,7 @@ def notch_filter(signal, fs, freq=50.0, Q=30.0):
 
 
 def bandpass_filter(signal, fs, lowcut=1.0, highcut=120.0, order=4):
-    sos = sig.butter(order, [lowcut, highcut], btype='band', fs=fs, output='sos')
+    sos = sps.butter(order, [lowcut, highcut], btype='band', fs=fs, output='sos')
     return sosfiltfilt(sos, signal, axis=-1)
 
 def resample_signal(signal, original_fs, target_fs=256):
