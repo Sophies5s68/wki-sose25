@@ -22,7 +22,7 @@ import torch
 import torch.nn as nn
 from CNN_model_copy import CNN_EEG
 from new_preprocess import preprocess_signal_with_montages
-from features_prediction import window_prediction, feature_extraction_window
+from faster_features import window_prediction, feature_extraction_window
 #from CNN_dataset import window_data_evaluate, create_fixed_grid_maps
 from glob import glob
 from scipy.signal import iirnotch, butter, sosfiltfilt, resample_poly, tf2sos
