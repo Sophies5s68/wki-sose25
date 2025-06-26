@@ -93,7 +93,7 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
             "onset_confidence": 0.0,
             "offset": 0.0,
             "offset_confidence": 0.0
-            
+        }
     # Klassifikation
     predictions_per_window =[]
     with torch.no_grad():
