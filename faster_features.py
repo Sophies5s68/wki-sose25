@@ -144,9 +144,12 @@ def feature_extraction_window(signals, fs, stft_window_size, stft_overlap):
     noverlap = int(nperseg * stft_overlap)
     feature_matr = []
 
-    feature_matr = []
-
     for channel in signals:
+        if np.all(channel == 0) or np.isnan(channel).any() or np.isinf(channel).any():
+            # Fallback bei defektem Kanal
+            feature_matr.append(np.zeros(15))  # 5 Bänder x 2 + 5 extra features
+            continue
+
         f, _, Zxx = stft(channel, fs=fs, nperseg=nperseg, noverlap=noverlap)
         psd = np.abs(Zxx) ** 2
         avg_spectrum = np.mean(psd, axis=1)
@@ -154,34 +157,47 @@ def feature_extraction_window(signals, fs, stft_window_size, stft_overlap):
 
         spectral_pwr = spectral_power(avg_spectrum, idx_dict)
         mean_amp = mean_spectral_amplitude(avg_spectrum, idx_dict)
-        hjorth_act, hjorth_mob, hjorth_comp = hjorthparameters(channel)
-        spec_ent = spectral_entropy(f, avg_spectrum)
-        pfd = petrosian_fd(channel)
+
+        try:
+            hjorth_act, hjorth_mob, hjorth_comp = hjorthparameters(channel)
+            spec_ent = spectral_entropy(f, avg_spectrum)
+            pfd = petrosian_fd(channel)
+        except:
+            hjorth_act, hjorth_mob, hjorth_comp, spec_ent, pfd = [0.0] * 5
 
         features = spectral_pwr + mean_amp + [hjorth_act, hjorth_mob, hjorth_comp, spec_ent, pfd]
         feature_matr.append(np.asarray(features))
 
-    return standardize_matrix(np.asarray(feature_matr))
+    matrix = np.asarray(feature_matr)
+    return standardize_matrix(matrix)
 
 
 def window_prediction(signal, resampled_fs, window_size, step_size):
-
     # Testet, ob Input in der richtigen Form ist 
-    if signal.ndim !=2: 
+    if signal.ndim != 2: 
         raise ValueError("Signal muss 2D sein, der Größe (n_channels, n_samples)")
+
     window_samples = int(window_size * resampled_fs)
     step_samples = int(step_size * resampled_fs)
     n_channels, n_samples = signal.shape
-    
+
     windows = []
     timestamps = []
-    
+
+    if n_samples < window_samples:
+        # Signal auf Fenstergröße mit Nullen am Ende auffüllen
+        pad_width = window_samples - n_samples
+        padded_signal = np.pad(signal, ((0, 0), (0, pad_width)), mode='constant')
+        windows.append(padded_signal)
+        timestamps.append(0.0)
+        return windows, timestamps
+
+    # Sliding-Window-Verfahren
     for start in range(0, n_samples - window_samples + 1, step_samples):
         end = start + window_samples
         window = signal[:, start:end]
         windows.append(window)
-        start_sec = start / resampled_fs
-        end_sec = end / resampled_fs
-        timestamps.append(start_sec)
+        timestamps.append(start / resampled_fs)
 
     return windows, timestamps
+
