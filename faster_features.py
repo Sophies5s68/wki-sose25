@@ -198,6 +198,11 @@ def window_prediction(signal, resampled_fs, window_size, step_size):
         window = signal[:, start:end]
         windows.append(window)
         timestamps.append(start / resampled_fs)
-
+    
+    if not windows:
+        padded_signal = np.pad(signal, ((0, 0), (0, window_samples - n_samples)), mode='constant')
+        windows = [padded_signal]
+        timestamps = [0.0]
+        
     return windows, timestamps
 
