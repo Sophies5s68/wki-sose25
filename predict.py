@@ -125,11 +125,17 @@ def predictions_ensemble(data_for_class: List[torch.Tensor], model_name: str, de
             model = CNN_EEG(6, 1).to(device)
             model.load_state_dict(torch.load(path, map_location=device))
             model.eval()
-            outputs = torch.sigmoid(model(batch_tensor).squeeze())
+            outputs = torch.sigmoid(model(batch_tensor)).squeeze(1)
             probs.append(outputs.cpu().numpy())  # shape: (num_windows,)
 
     ensemble_probs = np.mean(probs, axis=0)  # Mittelwert pro Fenster
-    return ensemble_probs.tolist()  # Gib Liste von Wahrscheinlichkeiten zurück
+
+
+    # Sicherstellen, dass es immer eine Liste ist
+    if np.isscalar(ensemble_probs):
+        return [ensemble_probs]
+    else:
+        return ensemble_probs.tolist()  # Gib Liste von Wahrscheinlichkeiten zurück
 
 
 def detect_onset(predictions, timestamps, min_consecutive=2):
