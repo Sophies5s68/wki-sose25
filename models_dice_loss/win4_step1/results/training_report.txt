@@ -1,4 +1,4 @@
-
+========== Config: win4_step1 ==========
 ========== FOLD 0 ==========
 Epoch 01: Train Loss=0.6013 | Train Acc=0.8306 | Val Acc=0.9135 | F1=0.4254
 Epoch 02: Train Loss=0.5292 | Train Acc=0.9329 | Val Acc=0.9267 | F1=0.4714

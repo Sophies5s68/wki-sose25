@@ -1,4 +1,4 @@
-
+========== Config: win8_step8 ==========
 ========== FOLD 0 ==========
 Epoch 01: Train Loss=0.6544 | Train Acc=0.4823 | Val Acc=0.6627 | F1=0.1895
 Epoch 02: Train Loss=0.6257 | Train Acc=0.7472 | Val Acc=0.7539 | F1=0.2306

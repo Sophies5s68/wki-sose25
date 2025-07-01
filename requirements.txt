@@ -11,3 +11,4 @@ pyprep
 scikit-learn
 antropy
 joblib
+lightgbm

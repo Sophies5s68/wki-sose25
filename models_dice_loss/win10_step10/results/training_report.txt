@@ -1,4 +1,4 @@
-
+========== Config: win10_step10 ==========
 ========== FOLD 0 ==========
 Epoch 01: Train Loss=0.6599 | Train Acc=0.4433 | Val Acc=0.6437 | F1=0.2318
 Epoch 02: Train Loss=0.6391 | Train Acc=0.6888 | Val Acc=0.7017 | F1=0.2626

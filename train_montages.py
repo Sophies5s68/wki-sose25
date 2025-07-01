@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import StratifiedGroupKFold
-from CNN_model import CNN_EEG, train_model, evaluate_model  # Stelle sicher, dass du die Klasse separat speicherst
+from CNN_model_copy import CNN_EEG, train_model, evaluate_model  # Stelle sicher, dass du die Klasse separat speicherst
 import numpy as np
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
@@ -141,7 +141,7 @@ class EarlyStopping:
     
 def main():
 
-    ordner = "/home/jupyter-wki_team_3/wki-sose25/montage_datasets/combined/"
+    ordner = "/home/jupyter-wki_team_3/wki-sose25/add_dataset/combined/"
     unterordner = [f for f in os.listdir(ordner) if os.path.isdir(os.path.join(ordner, f)) and not f.startswith('.')]
     
     epochs = 50
@@ -152,7 +152,7 @@ def main():
         print(f"training auf {config}")
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
-        data_folder = "/home/jupyter-wki_team_3/wki-sose25/montage_datasets/combined/" + config
+        data_folder = "/home/jupyter-wki_team_3/wki-sose25/add_dataset/combined/" + config
         file_paths = sorted(glob(os.path.join(data_folder, "*.pt")))
     
         if not file_paths:
@@ -246,6 +246,7 @@ def main():
         report_path = os.path.join(result_path, "training_report.txt")
 
         with open(report_path, "w") as f:
+            f.write(f"\n========== Config: {config} ==========\n")
             for fold in range(len(all_train_losses)):
                 f.write(f"\n========== FOLD {fold} ==========\n")
                 for epoch in range(len(all_train_losses[fold])):

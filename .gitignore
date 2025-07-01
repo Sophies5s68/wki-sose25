@@ -154,4 +154,7 @@ LSTM/positive_filtered.pkl
 LSTM/batches_LSTM/
 LSTM/positive_filtered_100Hz.pkl
 data_features_sep/
-
+add_dataset/
+scalogram_dataset/
+raw_dataset/
+LSTM/tensor_batches/

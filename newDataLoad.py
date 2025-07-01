@@ -5,12 +5,12 @@ import os, torch
 import numpy as np
 
 # Define the window and step size combinations
-window_step_configs = [(4, 2), (4, 1), (8, 4), (8, 8), (10, 5), (10, 10), (20, 10), (20, 20), (30, 15), (30, 30)]
+window_step_configs = [(1,1),(1,0.5),(2,2),(2,1),(3,3),(3,1)]
 
 dataset = EEGDataset("../shared_data/training")
 
 for window_size, step_size in window_step_configs:
-    save_folder = f"montage_datasets/win{window_size}_step{step_size}"
+    save_folder = f"add_dataset/win{window_size}_step{step_size}"
     os.makedirs(save_folder, exist_ok=True)
 
     print(f"\nStarting config: window={window_size}s, step={step_size}s")

@@ -1,0 +1,20 @@
+TO DOs:
+
+Fix spectral only
+fix time only
+
+Classifier:
+SVM --> gemacht mit lables, patients und label+patients
+Random Forest ---> gemacht mit lables, patients und label+patients 
+Bayes Klassifier ---> gemacht mit lables, patients und label+patients 
+LightGBM  ---> gemacht mit lables, patients und label+patients
+Kneighrest neighbors
+
+Unseren Datensatz analysieren, statistiken 
+
+CNN -> Parameter ausprobieren (Learning rate, batch size, Optimierer, Aktivierungsfunktionen)
+
+flaches CNN auprobieren auf alle Daten
+
+Windowing ausprobieren 
+

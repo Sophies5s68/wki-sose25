@@ -11,6 +11,7 @@ import os
 from glob import glob
 from sklearn.utils.class_weight import compute_class_weight
 from collections import Counter
+import gc
 
 #kleine Veränderung bei EEGWDataset, da jetzt mehrere Daten in einer .pt Datei zusammengefasst, beschleunigt den Ladeprozess
 
@@ -227,8 +228,8 @@ class SubsetDataset(Dataset):
         return self.base_dataset[self.indices[idx]]
             
 def main():
-    data_folder = "montage_datasets/combined/win4_step1/" 
-    run_name = "test"  
+    data_folder = "add_dataset/combined/win3_step3" 
+    run_name = "win3_step_3"  
 
     epochs = 50
     batch_size = 512
@@ -260,7 +261,7 @@ def main():
         print(f"========== FOLD {i} ==========")
 
         train_loader = DataLoader(Subset(dataset, train_idx), batch_size=batch_size, shuffle=True,
-                                  num_workers=16, pin_memory=True, persistent_workers=True)
+                                  num_workers=16, pin_memory=True, persistent_workers=False)
         val_loader = DataLoader(Subset(dataset, val_idx), batch_size=batch_size, shuffle=False,
                                 num_workers=16, pin_memory=True)
 
@@ -305,7 +306,14 @@ def main():
         all_train_accuracies.append(fold_train_accuracies)
         all_val_accuracies.append(fold_test_accuracies)
         all_f1_scores.append(fold_f1)
-
+        
+        #Speicherplatz nach jedem Fold wieder freigeben
+        del train_loader
+        del val_loader
+        del model
+        torch.cuda.empty_cache()  # wenn CUDA verwendet wird
+        gc.collect()
+        
     # === SPEICHERN ===
     save_path = os.path.join("models_testing", run_name)
     os.makedirs(save_path, exist_ok=True)
