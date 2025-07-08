@@ -12,6 +12,8 @@ from glob import glob
 from sklearn.utils.class_weight import compute_class_weight
 from collections import Counter
 import gc
+import csv
+import pandas as pd
 
 #kleine Veränderung bei EEGWDataset, da jetzt mehrere Daten in einer .pt Datei zusammengefasst, beschleunigt den Ladeprozess
 
@@ -230,7 +232,7 @@ class SubsetDataset(Dataset):
 def main():
     
     
-    data_folder = "montage_datasets/combined/win4_step1"  
+    data_folder = "data_new_window/win4_step1"  
 
     epochs = 50
     
@@ -338,7 +340,8 @@ def main():
             fold_train_accuracies = []
             fold_test_accuracies = []
             fold_f1 = []
-
+            
+         
             for epoch in range(epochs):
                 train_loss, train_acc = train_model(model, train_loader, optimizer, loss_fn, device)
                 val_acc, y_true, y_pred, f1 = evaluate_model(model, val_loader, device)
@@ -372,7 +375,7 @@ def main():
             gc.collect()
 
         # === SPEICHERN ===
-        save_path = os.path.join("models_testing", config_id)
+        save_path = os.path.join("models_newWin", config_id)
         os.makedirs(save_path, exist_ok=True)
 
         result_path = os.path.join(save_path, "results")
@@ -400,45 +403,26 @@ def main():
                 f.write("Confusion Matrix last epoch:\n")
                 f.write(np.array2string(all_confusion_matrices[fold], separator=', ') + "\n")
 
-        # === PLOTs ===
-        for fold in range(len(all_train_losses)):
-            epochs_fold = list(range(1, len(all_train_losses[fold]) + 1))
-            fig, axs = plt.subplots(1, 2, figsize=(15, 5))
-            axs[0].plot(epochs_fold, all_train_losses[fold], label='Train Loss')
-            axs[0].set_title(f"Training Loss - Fold {fold+1}")
-            axs[1].plot(epochs_fold, all_train_accuracies[fold], label='Train Acc')
-            axs[1].plot(epochs_fold, all_val_accuracies[fold], label='Val Acc')
-            axs[1].set_title(f"Accuracy - Fold {fold+1}")
-            for ax in axs:
-                ax.set_xlabel("Epoch")
-                ax.set_ylabel("Metric")
-                ax.legend()
-                ax.grid(True)
-            plt.tight_layout()
-            plt.savefig(os.path.join(result_path, f"metrics_fold{fold+1}.png"))
-            plt.close()
+        # === CSVs ===
+        csv_path = os.path.join(result_path, "training_metrics.csv")
+        with open(csv_path, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
 
-        min_len = min(len(x) for x in all_train_losses)
-        mean_train_loss = np.mean([x[:min_len] for x in all_train_losses], axis=0)
-        mean_train_acc = np.mean([x[:min_len] for x in all_train_accuracies], axis=0)
-        mean_val_acc = np.mean([x[:min_len] for x in all_val_accuracies], axis=0)
-        epochs_avg = list(range(1, min_len + 1))
+            # Header
+            writer.writerow(["config_id", "fold", "epoch", "train_loss", "train_acc", "val_acc", "f1_score"])
 
-        fig, axs = plt.subplots(1, 2, figsize=(15, 5))
-        axs[0].plot(epochs_avg, mean_train_loss, label='Avg Train Loss')
-        axs[1].plot(epochs_avg, mean_train_acc, label='Avg Train Acc')
-        axs[1].plot(epochs_avg, mean_val_acc, label='Avg Val Acc')
-        for ax in axs:
-            ax.set_xlabel("Epoch")
-            ax.set_ylabel("Metric")
-            ax.legend()
-            ax.grid(True)
-        axs[0].set_title("Average Training Loss")
-        axs[1].set_title("Average Accuracy")
-        plt.tight_layout()
-        plt.savefig(os.path.join(result_path, "average_metrics.png"))
-        plt.close()
-
+            # Zeilenweise schreiben
+            for fold in range(len(all_train_losses)):
+                for epoch in range(len(all_train_losses[fold])):
+                    writer.writerow([
+                        config_id,
+                        fold,
+                        epoch + 1,  # 1-basiert wie im Report
+                        round(all_train_losses[fold][epoch], 4),
+                        round(all_train_accuracies[fold][epoch], 4),
+                        round(all_val_accuracies[fold][epoch], 4),
+                        round(all_f1_scores[fold][epoch], 4)
+                    ])
     
 if __name__ == "__main__":
     main()

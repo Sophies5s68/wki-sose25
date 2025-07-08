@@ -12,12 +12,12 @@ class CNN_EEG(nn.Module):
         self.conv1 = nn.Conv1d(in_channels, out_channels = 64, kernel_size = 3, padding =1)
         self.bn1 = nn.BatchNorm1d(64) # mal ausprobieren
         self.pool1 = nn.MaxPool1d(kernel_size=2)
-        self.dropout1 = nn.Dropout1d(0.25)
+        self.dropout1 = nn.Dropout(0.25)
         
         self.conv2 = nn.Conv1d(64, out_channels= 128, kernel_size = 3, padding =1)
         self.bn2 = nn.BatchNorm1d(128)
         self.pool2 = nn.MaxPool1d(kernel_size=2)
-        self.dropout2 = nn.Dropout1d(0.25)
+        self.dropout2 = nn.Dropout(0.25)
         
         flattened_size = self._get_flattened_size(in_channels) # Eingangsgröße muss angepasst werden
         self.classifier = nn.Sequential(

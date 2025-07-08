@@ -228,300 +228,140 @@ class SubsetDataset(Dataset):
             
 def main():
     
-    data_folder = "montage_datasets/temporal_only_small/win4_step1" 
-    run_name = "temporal_flat"  
-
-    epochs = 50
-    batch_size = 512
-    lr = 1e-4
-
-    print(f"Training von {run_name}")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"training on {device}")
-    file_paths = sorted(glob(os.path.join(data_folder, "*.pt")))
-    if not file_paths:
-        print(f"[WARNUNG] Keine .pt-Dateien in {data_folder} gefunden – Abbruch.")
-        return
-
-    dataset = EEGWindowDatasetCombined(data_folder)
-    labels, groups = dataset.get_labels_and_groups()
-    torch.backends.cudnn.benchmark = True
-    print("loaded")
-
-    sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
-
-    all_confusion_matrices = []
-    all_best_model_states = []
-    all_train_losses = []
-    all_train_accuracies = []
-    all_val_accuracies = []
-    all_f1_scores = []
-
-    for i, (train_idx, val_idx) in enumerate(sgkf.split(X=range(len(dataset)), y=labels, groups=groups)):
-        print(f"========== FOLD {i} ==========")
-
-        train_loader = DataLoader(Subset(dataset, train_idx), batch_size=batch_size, shuffle=True,
-                                  num_workers=16, pin_memory=True, persistent_workers=True)
-        val_loader = DataLoader(Subset(dataset, val_idx), batch_size=batch_size, shuffle=False,
-                                num_workers=16, pin_memory=True)
-
-        train_labels = [labels[idx] for idx in train_idx]
-        counter = Counter(train_labels)
-        neg, pos = counter[0], counter[1]
-        pos_weight = neg / pos
-        pos_weight_tensor = torch.tensor([pos_weight], dtype=torch.float32).to(device)
-
-        model = CNN_EEG_1(in_channels=dataset[0][0].shape[0], n_classes=1, num_features=4).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-        loss_fn = CombinedLoss(pos_weight=pos_weight_tensor, alpha_dice=0.7, alpha_focal=0.3) 
-
-        early_stopper = EarlyStopping(patience=5, verbose=True)
-
-        fold_train_losses = []
-        fold_train_accuracies = []
-        fold_test_accuracies = []
-        fold_f1 = []
-
-        for epoch in range(epochs):
-            train_loss, train_acc = train_model(model, train_loader, optimizer, loss_fn, device)
-            val_acc, y_true, y_pred, f1 = evaluate_model(model, val_loader, device)
-
-            print(f"Epoch {epoch+1:02d}: Train Loss={train_loss:.4f} | Train Acc={train_acc:.4f} | "
-                  f"Val Acc={val_acc:.4f} | F1={f1:.4f}")
-
-            fold_train_losses.append(train_loss)
-            fold_train_accuracies.append(train_acc)
-            fold_test_accuracies.append(val_acc)
-            fold_f1.append(f1)
-
-            early_stopper(f1, model)
-            if early_stopper.early_stop:
-                print("  --> Early stopping triggered.")
-                break
-
-        cm = confusion_matrix(y_true, y_pred)
-        all_confusion_matrices.append(cm)
-        all_best_model_states.append(early_stopper.best_model_state)
-        all_train_losses.append(fold_train_losses)
-        all_train_accuracies.append(fold_train_accuracies)
-        all_val_accuracies.append(fold_test_accuracies)
-        all_f1_scores.append(fold_f1)
-
-    # === SPEICHERN ===
-    save_path = os.path.join("models_testing", run_name)
-    os.makedirs(save_path, exist_ok=True)
-
-    result_path = os.path.join(save_path, "results")
-    os.makedirs(result_path, exist_ok=True)
-
-    for fold, state_dict in enumerate(all_best_model_states):
-        torch.save(state_dict, os.path.join(save_path, f"best_model_fold{fold}.pth"))
-
-    report_path = os.path.join(result_path, "training_report.txt")
-    with open(report_path, "w") as f:
-        for fold in range(len(all_train_losses)):
-            f.write(f"\n========== FOLD {fold} ==========\n")
-            for epoch in range(len(all_train_losses[fold])):
-                f.write(f"Epoch {epoch+1:02d}: "
-                        f"Train Loss={all_train_losses[fold][epoch]:.4f} | "
-                        f"Train Acc={all_train_accuracies[fold][epoch]:.4f} | "
-                        f"Val Acc={all_val_accuracies[fold][epoch]:.4f} | "
-                        f"F1={all_f1_scores[fold][epoch]:.4f}\n")
-
-            f.write("\n--- Final Metrics ---\n")
-            f.write(f"Final Train Acc: {all_train_accuracies[fold][-1]:.4f}\n")
-            f.write(f"Final Val Acc:   {all_val_accuracies[fold][-1]:.4f}\n")
-            f.write(f"Final F1 Score:  {all_f1_scores[fold][-1]:.4f}\n")
-            f.write("Confusion Matrix last epoch:\n")
-            f.write(np.array2string(all_confusion_matrices[fold], separator=', ') + "\n")
-
-    # === PLOTs ===
-    for fold in range(len(all_train_losses)):
-        epochs_fold = list(range(1, len(all_train_losses[fold]) + 1))
-        fig, axs = plt.subplots(1, 2, figsize=(15, 5))
-        axs[0].plot(epochs_fold, all_train_losses[fold], label='Train Loss')
-        axs[0].set_title(f"Training Loss - Fold {fold+1}")
-        axs[1].plot(epochs_fold, all_train_accuracies[fold], label='Train Acc')
-        axs[1].plot(epochs_fold, all_val_accuracies[fold], label='Val Acc')
-        axs[1].set_title(f"Accuracy - Fold {fold+1}")
-        for ax in axs:
-            ax.set_xlabel("Epoch")
-            ax.set_ylabel("Metric")
-            ax.legend()
-            ax.grid(True)
-        plt.tight_layout()
-        plt.savefig(os.path.join(result_path, f"metrics_fold{fold+1}.png"))
-        plt.close()
-
-    min_len = min(len(x) for x in all_train_losses)
-    mean_train_loss = np.mean([x[:min_len] for x in all_train_losses], axis=0)
-    mean_train_acc = np.mean([x[:min_len] for x in all_train_accuracies], axis=0)
-    mean_val_acc = np.mean([x[:min_len] for x in all_val_accuracies], axis=0)
-    epochs_avg = list(range(1, min_len + 1))
-
-    fig, axs = plt.subplots(1, 2, figsize=(15, 5))
-    axs[0].plot(epochs_avg, mean_train_loss, label='Avg Train Loss')
-    axs[1].plot(epochs_avg, mean_train_acc, label='Avg Train Acc')
-    axs[1].plot(epochs_avg, mean_val_acc, label='Avg Val Acc')
-    for ax in axs:
-        ax.set_xlabel("Epoch")
-        ax.set_ylabel("Metric")
-        ax.legend()
-        ax.grid(True)
-    axs[0].set_title("Average Training Loss")
-    axs[1].set_title("Average Accuracy")
-    plt.tight_layout()
-    plt.savefig(os.path.join(result_path, "average_metrics.png"))
-    plt.close()
+    configs = [
+    ("spectral_flat", "data_new_window/spectral_features/win4_step1", 11),
+    ("temporal_flat","data_new_window/temporal_features/win4_step1", 4),
+    ("all_flat","data_new_window/win4_step1", 4)]
     
-    
-    
-    # und alles nochmal mit allen features:
-    data_folder = "montage_datasets/combined/win4_step1" 
-    run_name = "all_features_flat"  
+    for config in configs:
+        
+        run_name,data_folder, num_features = config
+        
+        epochs = 50
+        batch_size = 512
+        lr = 1e-4
 
-    epochs = 50
-    batch_size = 512
-    lr = 1e-4
+        print(f"Training von {run_name}")
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        print(f"training on {device}")
+        file_paths = sorted(glob(os.path.join(data_folder, "*.pt")))
+        if not file_paths:
+            print(f"[WARNUNG] Keine .pt-Dateien in {data_folder} gefunden – Abbruch.")
+            return
 
-    print(f"Training von {run_name}")
-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-    print(f"training on {device}")
-    file_paths = sorted(glob(os.path.join(data_folder, "*.pt")))
-    if not file_paths:
-        print(f"[WARNUNG] Keine .pt-Dateien in {data_folder} gefunden – Abbruch.")
-        return
+        dataset = EEGWindowDatasetCombined(data_folder)
+        labels, groups = dataset.get_labels_and_groups()
+        torch.backends.cudnn.benchmark = True
+        print("loaded")
 
-    dataset = EEGWindowDatasetCombined(data_folder)
-    labels, groups = dataset.get_labels_and_groups()
-    torch.backends.cudnn.benchmark = True
-    print("loaded")
+        sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
 
-    sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
+        all_confusion_matrices = []
+        all_best_model_states = []
+        all_train_losses = []
+        all_train_accuracies = []
+        all_val_accuracies = []
+        all_f1_scores = []
 
-    all_confusion_matrices = []
-    all_best_model_states = []
-    all_train_losses = []
-    all_train_accuracies = []
-    all_val_accuracies = []
-    all_f1_scores = []
+        for i, (train_idx, val_idx) in enumerate(sgkf.split(X=range(len(dataset)), y=labels, groups=groups)):
+            print(f"========== FOLD {i} ==========")
 
-    for i, (train_idx, val_idx) in enumerate(sgkf.split(X=range(len(dataset)), y=labels, groups=groups)):
-        print(f"========== FOLD {i} ==========")
+            train_loader = DataLoader(Subset(dataset, train_idx), batch_size=batch_size, shuffle=True,
+                                      num_workers=16, pin_memory=True, persistent_workers=True)
+            val_loader = DataLoader(Subset(dataset, val_idx), batch_size=batch_size, shuffle=False,
+                                    num_workers=16, pin_memory=True)
 
-        train_loader = DataLoader(Subset(dataset, train_idx), batch_size=batch_size, shuffle=True,
-                                  num_workers=16, pin_memory=True, persistent_workers=True)
-        val_loader = DataLoader(Subset(dataset, val_idx), batch_size=batch_size, shuffle=False,
-                                num_workers=16, pin_memory=True)
+            train_labels = [labels[idx] for idx in train_idx]
+            counter = Counter(train_labels)
+            neg, pos = counter[0], counter[1]
+            pos_weight = neg / pos
+            pos_weight_tensor = torch.tensor([pos_weight], dtype=torch.float32).to(device)
 
-        train_labels = [labels[idx] for idx in train_idx]
-        counter = Counter(train_labels)
-        neg, pos = counter[0], counter[1]
-        pos_weight = neg / pos
-        pos_weight_tensor = torch.tensor([pos_weight], dtype=torch.float32).to(device)
+            model = CNN_EEG_1(in_channels=dataset[0][0].shape[0], n_classes=1, num_features).to(device)
+            optimizer = torch.optim.Adam(model.parameters(), lr=lr)
+            loss_fn = CombinedLoss(pos_weight=pos_weight_tensor, alpha_dice=0.7, alpha_focal=0.3) 
 
-        model = CNN_EEG_1(in_channels=dataset[0][0].shape[0], n_classes=1, num_features=15).to(device)
-        optimizer = torch.optim.Adam(model.parameters(), lr=lr)
-        loss_fn = CombinedLoss(pos_weight=pos_weight_tensor, alpha_dice=0.7, alpha_focal=0.3) 
+            early_stopper = EarlyStopping(patience=5, verbose=True)
 
-        early_stopper = EarlyStopping(patience=5, verbose=True)
+            fold_train_losses = []
+            fold_train_accuracies = []
+            fold_test_accuracies = []
+            fold_f1 = []
 
-        fold_train_losses = []
-        fold_train_accuracies = []
-        fold_test_accuracies = []
-        fold_f1 = []
+            for epoch in range(epochs):
+                train_loss, train_acc = train_model(model, train_loader, optimizer, loss_fn, device)
+                val_acc, y_true, y_pred, f1 = evaluate_model(model, val_loader, device)
 
-        for epoch in range(epochs):
-            train_loss, train_acc = train_model(model, train_loader, optimizer, loss_fn, device)
-            val_acc, y_true, y_pred, f1 = evaluate_model(model, val_loader, device)
+                print(f"Epoch {epoch+1:02d}: Train Loss={train_loss:.4f} | Train Acc={train_acc:.4f} | "
+                      f"Val Acc={val_acc:.4f} | F1={f1:.4f}")
 
-            print(f"Epoch {epoch+1:02d}: Train Loss={train_loss:.4f} | Train Acc={train_acc:.4f} | "
-                  f"Val Acc={val_acc:.4f} | F1={f1:.4f}")
+                fold_train_losses.append(train_loss)
+                fold_train_accuracies.append(train_acc)
+                fold_test_accuracies.append(val_acc)
+                fold_f1.append(f1)
 
-            fold_train_losses.append(train_loss)
-            fold_train_accuracies.append(train_acc)
-            fold_test_accuracies.append(val_acc)
-            fold_f1.append(f1)
+                early_stopper(f1, model)
+                if early_stopper.early_stop:
+                    print("  --> Early stopping triggered.")
+                    break
 
-            early_stopper(f1, model)
-            if early_stopper.early_stop:
-                print("  --> Early stopping triggered.")
-                break
+            cm = confusion_matrix(y_true, y_pred)
+            all_confusion_matrices.append(cm)
+            all_best_model_states.append(early_stopper.best_model_state)
+            all_train_losses.append(fold_train_losses)
+            all_train_accuracies.append(fold_train_accuracies)
+            all_val_accuracies.append(fold_test_accuracies)
+            all_f1_scores.append(fold_f1)
 
-        cm = confusion_matrix(y_true, y_pred)
-        all_confusion_matrices.append(cm)
-        all_best_model_states.append(early_stopper.best_model_state)
-        all_train_losses.append(fold_train_losses)
-        all_train_accuracies.append(fold_train_accuracies)
-        all_val_accuracies.append(fold_test_accuracies)
-        all_f1_scores.append(fold_f1)
+        # === SPEICHERN ===
+        save_path = os.path.join("models_testing", run_name)
+        os.makedirs(save_path, exist_ok=True)
 
-    # === SPEICHERN ===
-    save_path = os.path.join("models_testing", run_name)
-    os.makedirs(save_path, exist_ok=True)
+        result_path = os.path.join(save_path, "results")
+        os.makedirs(result_path, exist_ok=True)
 
-    result_path = os.path.join(save_path, "results")
-    os.makedirs(result_path, exist_ok=True)
+        for fold, state_dict in enumerate(all_best_model_states):
+            torch.save(state_dict, os.path.join(save_path, f"best_model_fold{fold}.pth"))
 
-    for fold, state_dict in enumerate(all_best_model_states):
-        torch.save(state_dict, os.path.join(save_path, f"best_model_fold{fold}.pth"))
+        report_path = os.path.join(result_path, "training_report.txt")
+        with open(report_path, "w") as f:
+            for fold in range(len(all_train_losses)):
+                f.write(f"\n========== FOLD {fold} ==========\n")
+                for epoch in range(len(all_train_losses[fold])):
+                    f.write(f"Epoch {epoch+1:02d}: "
+                            f"Train Loss={all_train_losses[fold][epoch]:.4f} | "
+                            f"Train Acc={all_train_accuracies[fold][epoch]:.4f} | "
+                            f"Val Acc={all_val_accuracies[fold][epoch]:.4f} | "
+                            f"F1={all_f1_scores[fold][epoch]:.4f}\n")
 
-    report_path = os.path.join(result_path, "training_report.txt")
-    with open(report_path, "w") as f:
-        for fold in range(len(all_train_losses)):
-            f.write(f"\n========== FOLD {fold} ==========\n")
-            for epoch in range(len(all_train_losses[fold])):
-                f.write(f"Epoch {epoch+1:02d}: "
-                        f"Train Loss={all_train_losses[fold][epoch]:.4f} | "
-                        f"Train Acc={all_train_accuracies[fold][epoch]:.4f} | "
-                        f"Val Acc={all_val_accuracies[fold][epoch]:.4f} | "
-                        f"F1={all_f1_scores[fold][epoch]:.4f}\n")
+                f.write("\n--- Final Metrics ---\n")
+                f.write(f"Final Train Acc: {all_train_accuracies[fold][-1]:.4f}\n")
+                f.write(f"Final Val Acc:   {all_val_accuracies[fold][-1]:.4f}\n")
+                f.write(f"Final F1 Score:  {all_f1_scores[fold][-1]:.4f}\n")
+                f.write("Confusion Matrix last epoch:\n")
+                f.write(np.array2string(all_confusion_matrices[fold], separator=', ') + "\n")
 
-            f.write("\n--- Final Metrics ---\n")
-            f.write(f"Final Train Acc: {all_train_accuracies[fold][-1]:.4f}\n")
-            f.write(f"Final Val Acc:   {all_val_accuracies[fold][-1]:.4f}\n")
-            f.write(f"Final F1 Score:  {all_f1_scores[fold][-1]:.4f}\n")
-            f.write("Confusion Matrix last epoch:\n")
-            f.write(np.array2string(all_confusion_matrices[fold], separator=', ') + "\n")
+         # === CSVs ===
+        csv_path = os.path.join(result_path, "training_metrics.csv")
+        with open(csv_path, "w", newline="") as csvfile:
+            writer = csv.writer(csvfile)
 
-    # === PLOTs ===
-    for fold in range(len(all_train_losses)):
-        epochs_fold = list(range(1, len(all_train_losses[fold]) + 1))
-        fig, axs = plt.subplots(1, 2, figsize=(15, 5))
-        axs[0].plot(epochs_fold, all_train_losses[fold], label='Train Loss')
-        axs[0].set_title(f"Training Loss - Fold {fold+1}")
-        axs[1].plot(epochs_fold, all_train_accuracies[fold], label='Train Acc')
-        axs[1].plot(epochs_fold, all_val_accuracies[fold], label='Val Acc')
-        axs[1].set_title(f"Accuracy - Fold {fold+1}")
-        for ax in axs:
-            ax.set_xlabel("Epoch")
-            ax.set_ylabel("Metric")
-            ax.legend()
-            ax.grid(True)
-        plt.tight_layout()
-        plt.savefig(os.path.join(result_path, f"metrics_fold{fold+1}.png"))
-        plt.close()
+            # Header
+            writer.writerow(["config_id", "fold", "epoch", "train_loss", "train_acc", "val_acc", "f1_score"])
 
-    min_len = min(len(x) for x in all_train_losses)
-    mean_train_loss = np.mean([x[:min_len] for x in all_train_losses], axis=0)
-    mean_train_acc = np.mean([x[:min_len] for x in all_train_accuracies], axis=0)
-    mean_val_acc = np.mean([x[:min_len] for x in all_val_accuracies], axis=0)
-    epochs_avg = list(range(1, min_len + 1))
+            # Zeilenweise schreiben
+            for fold in range(len(all_train_losses)):
+                for epoch in range(len(all_train_losses[fold])):
+                    writer.writerow([
+                        config_id,
+                        fold,
+                        epoch + 1,  # 1-basiert wie im Report
+                        round(all_train_losses[fold][epoch], 4),
+                        round(all_train_accuracies[fold][epoch], 4),
+                        round(all_val_accuracies[fold][epoch], 4),
+                        round(all_f1_scores[fold][epoch], 4)
+                    ])
 
-    fig, axs = plt.subplots(1, 2, figsize=(15, 5))
-    axs[0].plot(epochs_avg, mean_train_loss, label='Avg Train Loss')
-    axs[1].plot(epochs_avg, mean_train_acc, label='Avg Train Acc')
-    axs[1].plot(epochs_avg, mean_val_acc, label='Avg Val Acc')
-    for ax in axs:
-        ax.set_xlabel("Epoch")
-        ax.set_ylabel("Metric")
-        ax.legend()
-        ax.grid(True)
-    axs[0].set_title("Average Training Loss")
-    axs[1].set_title("Average Accuracy")
-    plt.tight_layout()
-    plt.savefig(os.path.join(result_path, "average_metrics.png"))
-    plt.close()
     
     
 if __name__ == "__main__":
