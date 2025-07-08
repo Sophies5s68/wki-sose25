@@ -1,0 +1,53 @@
+{
+    "label_distribution": {
+        "positive": 2421,
+        "negative": 3792
+    },
+    "reference_systems": {
+        "LE": 800,
+        "AR": 5413
+    },
+    "sampling_frequencies": {
+        "250": 1543,
+        "256": 3801,
+        "400": 700,
+        "512": 100,
+        "1000": 69
+    },
+    "patients": {
+        "unique_patient_count": 579,
+        "total_recordings": 6213,
+        "top_5_patients": [
+            [
+                "aaaaapks",
+                268
+            ],
+            [
+                "aaaaaqtx",
+                150
+            ],
+            [
+                "aaaaajqo",
+                131
+            ],
+            [
+                "aaaaanme",
+                105
+            ],
+            [
+                "aaaaates",
+                104
+            ]
+        ]
+    },
+    "channels": {
+        "mean": 18.970062771607918,
+        "min": 17,
+        "max": 19
+    },
+    "data_lengths": {
+        "mean": 147440,
+        "min": 400,
+        "max": 12668160
+    }
+}

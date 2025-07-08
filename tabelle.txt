@@ -1,0 +1,16 @@
+Bezeichnung                      |  Fold 1 |  Fold 2 |  Fold 3 |  Fold 4 |  Fold 5
+--------------------------------------------------------------------------------
+Zeitfenster                      |         |         |         |         |        
+win1_step0.5                     |    0.98 |       3 |    Nein |   Code3 |       5
+win1_step1                       |    2.34 |       1 |      Ja |   Code7 |       9
+win2_step2                       |    2.34 |       1 |      Ja |   Code7 |       9
+win3_step1                       |    2.34 |       1 |      Ja |   Code7 |       9
+win3_step3                       |    2.34 |       1 |      Ja |   Code7 |       9
+win4_step1                       |    2.34 |       1 |      Ja |   Code7 |       9
+win4_step2                       |    2.34 |       1 |      Ja |   Code7 |       9
+win4_step4                       |    2.34 |       1 |      Ja |   Code7 |       9
+win8_step4                       |    2.34 |       1 |      Ja |   Code7 |       9
+win8_step8                       |    2.34 |       1 |      Ja |   Code7 |       9
+win10_step5                      |    2.34 |       1 |      Ja |   Code7 |       9
+win10_step10                     |    2.34 |       1 |      Ja |   Code7 |       9
+win1_step1                       |    2.34 |       1 |      Ja |   Code7 |       9

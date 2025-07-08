@@ -158,3 +158,4 @@ add_dataset/
 scalogram_dataset/
 raw_dataset/
 LSTM/tensor_batches/
+scalogram_dataset/

@@ -13,38 +13,63 @@ bands = ({'delta' : [1,4],
 
 def window_eeg_data(signal, resampled_fs, seizure_onset, seizure_offset, window_size, step_size):
     """
+    Splits EEG signal into overlapping windows and assigns seizure labels.
+
     Returns:
-    - windows: Liste mit nparrays, mit der shape (n_channels, window_samples)
-    - labels: Liste mit 0 (kein Anfall) und 1 (Anfall)
-    - timestamps: Liste mit Zeiten von den Fenstern in Sekunden
-    
+    - windows: list of np arrays with shape (n_channels, window_samples)
+    - labels: list with 0 (no seizure) or 1 (seizure) per window
+    - timestamps: list with window start times in seconds
+    - used_whole_recording: True if recording was shorter than one window
     """
-    # Testet, ob Input in der richtigen Form ist 
-    if signal.ndim !=2: 
-        raise ValueError("Signal muss 2D sein, der Größe (n_channels, n_samples)")
+    if signal.ndim != 2:
+        raise ValueError("Signal must be 2D with shape (n_channels, n_samples)")
+
     window_samples = int(window_size * resampled_fs)
     step_samples = int(step_size * resampled_fs)
     n_channels, n_samples = signal.shape
-    
+
     windows = []
     labels = []
     timestamps = []
-    
+    used_whole_recording = False
+
+    # Check if seizure interval is meaningful
+    has_valid_seizure = not (seizure_onset == 0.0 and seizure_offset == 0.0)
+
+    # If recording is shorter than one window, use whole signal as one window
+    if n_samples < window_samples:
+        windows.append(signal)
+        timestamps.append(0.0)
+        used_whole_recording = True
+
+        start_sec = 0.0
+        end_sec = n_samples / resampled_fs
+
+        if has_valid_seizure:
+            label = 1 if (end_sec >= seizure_onset and start_sec <= seizure_offset) else 0
+        else:
+            label = 0
+        labels.append(label)
+        return windows, labels, timestamps, used_whole_recording
+
+    # Normal sliding window
     for start in range(0, n_samples - window_samples + 1, step_samples):
         end = start + window_samples
         window = signal[:, start:end]
         windows.append(window)
+
         start_sec = start / resampled_fs
         end_sec = end / resampled_fs
         timestamps.append(start_sec)
 
-        # Window bekommt Lable 1, wenn Anfall vorhanden ist, sonst 0
-        if end_sec >= seizure_onset and start_sec <= seizure_offset:
-            labels.append(1)
+        if has_valid_seizure:
+            label = 1 if (end_sec >= seizure_onset and start_sec <= seizure_offset) else 0
         else:
-            labels.append(0)
+            label = 0
 
-    return windows, labels, timestamps
+        labels.append(label)
+
+    return windows, labels, timestamps, used_whole_recording
 
 # Windowing mit kleineren Windows während Anfällen um Samples für Anfälle zu steigern
 

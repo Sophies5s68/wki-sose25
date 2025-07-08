@@ -228,8 +228,8 @@ class SubsetDataset(Dataset):
         return self.base_dataset[self.indices[idx]]
             
 def main():
-    data_folder = "add_dataset/combined/win3_step3" 
-    run_name = "win3_step_3"  
+    data_folder = "add_dataset/combined/win4_step1/" 
+    run_name = "new_window_function"  
 
     epochs = 50
     batch_size = 512

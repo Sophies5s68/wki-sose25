@@ -1,1 +1,0 @@
-run successfull! Your testing results on training_mini were: {'performance_metric_WS23': 0.6923076923076924, 'F1': 0.7857142857142857, 'Latenz': 16.999680555555553, 'Laufzeit': '00:27:09'}

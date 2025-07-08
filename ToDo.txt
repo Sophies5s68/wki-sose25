@@ -1,7 +1,8 @@
 TO DOs:
 
-Fix spectral only
-fix time only
+spectral only  --> idk wo killed herkam, Training auf tiefem CNN hat funktioniert
+time only --> erledigt (temporal_large)
+
 
 Classifier:
 SVM --> gemacht mit lables, patients und label+patients
@@ -10,11 +11,16 @@ Bayes Klassifier ---> gemacht mit lables, patients und label+patients
 LightGBM  ---> gemacht mit lables, patients und label+patients
 Kneighrest neighbors
 
-Unseren Datensatz analysieren, statistiken 
+Unseren Datensatz analysieren, statistiken --> gemacht, csvs gespeichert mit vertschiedenen Statistiken
 
-CNN -> Parameter ausprobieren (Learning rate, batch size, Optimierer, Aktivierungsfunktionen)
+CNN -> Parameter ausprobieren (Learning rate, batch size, Optimierer, Aktivierungsfunktionen) ---> alle aosprobiert, Ergebnisse in Results.txt
+    fehlende Parameter traineiren --> jetzt soweit vollständig
+    trainieren auf optimal (sollte aber eh nur sehr kleine Veränderung)
 
-flaches CNN auprobieren auf alle Daten
+flaches CNN:
+    spectral_only --> spectral flat (ziemlich schwache Ergebnisse)
+    time_only
+    alle Daten
 
 Windowing ausprobieren 
 

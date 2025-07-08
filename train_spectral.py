@@ -227,8 +227,8 @@ class SubsetDataset(Dataset):
         return self.base_dataset[self.indices[idx]]
             
 def main():
-    data_folder = "montage_datasets/spectral_only_small/win4_step1" 
-    run_name = "spectral_512"  
+    data_folder = "montage_datasets/temporal_only_small/win4_step1" 
+    run_name = "temporal_large"  
 
     epochs = 50
     batch_size = 512

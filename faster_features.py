@@ -206,3 +206,20 @@ def window_prediction(signal, resampled_fs, window_size, step_size):
         
     return windows, timestamps
 
+def compute_spectrogram(window, n_fft=128, hop_length=64, win_length=128):
+    """
+    window: tensor of shape [channels, samples]
+    returns: tensor [channels, freq_bins, time_bins] (magnitude, log scaled)
+    """
+    channels, samples = window.shape
+    specs = []
+    window_fn = torch.hann_window(win_length)
+    
+    for ch in range(channels):
+        stft_res = torch.stft(window[ch], n_fft=n_fft, hop_length=hop_length, win_length=win_length,
+                              window=window_fn, return_complex=True)
+        mag = torch.abs(stft_res)
+        specs.append(torch.log1p(mag))
+        
+    specs = torch.stack(specs)  # [channels, freq_bins, time_bins]
+    return specs

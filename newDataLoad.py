@@ -5,7 +5,7 @@ import os, torch
 import numpy as np
 
 # Define the window and step size combinations
-window_step_configs = [(1,1),(1,0.5),(2,2),(2,1),(3,3),(3,1)]
+window_step_configs = [(4,1)]
 
 dataset = EEGDataset("../shared_data/training")
 
@@ -29,7 +29,7 @@ for window_size, step_size in window_step_configs:
             continue
 
         # 2. Windowing + labeling
-        windows, labels, timestamps = window_eeg_data(
+        windows, labels, timestamps, idk = window_eeg_data(
             processed_signal, resampled_fs=new_fs,
             seizure_onset=seizure_onset,
             seizure_offset=seizure_offset,

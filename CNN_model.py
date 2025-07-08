@@ -31,7 +31,7 @@ class CNN_EEG(nn.Module):
     
     def _get_flattened_size(self, in_channels):
         with torch.no_grad():
-            x = torch.zeros(1, in_channels, 11)  # Anzahl spectral features, VERÄNDERN JE NACH INPUT
+            x = torch.zeros(1, in_channels, 4)  # Anzahl spectral features, VERÄNDERN JE NACH INPUT
             x = self.pool1(F.relu(self.conv1(x)))
             x = self.pool2(F.relu(self.conv2(x)))
         return x.view(1, -1).shape[1]
