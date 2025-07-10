@@ -245,14 +245,15 @@ def main():
     }
 
     #mögliche parameter definieren
+    #"name": "AdamW", "class": torch.optim.AdamW, "kwargs": {"lr": default_lr, "weight_decay": 1e-2}},
+    #"name": "RMSprop", "class": torch.optim.RMSprop, "kwargs": {"lr": default_lr, "alpha": 0.9}},
+    #"name": "SGD", "class": torch.optim.SGD, "kwargs": {"lr": default_lr, "momentum": 0.9, "weight_decay": 1e-4}}
     optimizers = [
-    {"name": "AdamW", "class": torch.optim.AdamW, "kwargs": {"lr": default_lr, "weight_decay": 1e-2}},
-    {"name": "RMSprop", "class": torch.optim.RMSprop, "kwargs": {"lr": default_lr, "alpha": 0.9}},
-    {"name": "SGD", "class": torch.optim.SGD, "kwargs": {"lr": default_lr, "momentum": 0.9, "weight_decay": 1e-4}},
     ]
 
+    #1e-5, 1e-3, 
     
-    lrates = [1e-5, 1e-3, 1e-2]
+    lrates = [1e-2]
     
     batch_sizes = [256, 1024, 2048, 4096]
 
@@ -317,9 +318,9 @@ def main():
             print(f"========== FOLD {i} ==========")
 
             train_loader = DataLoader(Subset(dataset, train_idx), batch_size=bs, shuffle=True,
-                                      num_workers=16, pin_memory=True, persistent_workers=True)
+                                      num_workers=8, pin_memory=True, persistent_workers=True)
             val_loader = DataLoader(Subset(dataset, val_idx), batch_size=bs, shuffle=False,
-                                    num_workers=16, pin_memory=True)
+                                    num_workers=8, pin_memory=True)
 
             train_labels = [labels[idx] for idx in train_idx]
             counter = Counter(train_labels)

@@ -30,7 +30,7 @@ class CNN_EEG_flat(nn.Module):
 
 # Flacheres Model mit tanh als Aktivierungsfunktion        
 class CNN_EEG_1(nn.Module):
-    def __init__(self, in_channels, n_classes,num_features):
+    def __init__(self, in_channels, n_classes, num_features):
         super(CNN_EEG_1, self).__init__()
         
         self.conv1 = nn.Conv1d(in_channels, out_channels = 64, kernel_size = 3, padding =1)

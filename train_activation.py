@@ -12,6 +12,7 @@ from glob import glob
 from sklearn.utils.class_weight import compute_class_weight
 from collections import Counter
 import gc
+import csv
 
 #kleine Veränderung bei EEGWDataset, da jetzt mehrere Daten in einer .pt Datei zusammengefasst, beschleunigt den Ladeprozess
 
@@ -238,11 +239,11 @@ def main():
 
 
     # Dictionary mit verschiedenen Aktivierungsfunktionen
+    #"LeakyReLU": nn.LeakyReLU(negative_slope=0.01),
+    #"ELU": nn.ELU(alpha=1.0),
     activation_functions = {
-        "LeakyReLU": nn.LeakyReLU(negative_slope=0.01),
-        "ELU": nn.ELU(alpha=1.0),
         "GELU": nn.GELU(),
-        "SiLU": nn.SiLU(),  # Swish
+        "SiLU": nn.SiLU(),  
         "Tanh": nn.Tanh(),
     }
 
@@ -331,7 +332,7 @@ def main():
             gc.collect()
 
         # === SPEICHERN ===
-        save_path = os.path.join("models_testing", name)
+        save_path = os.path.join("models_newWin", name)
         os.makedirs(save_path, exist_ok=True)
 
         result_path = os.path.join(save_path, "results")
@@ -371,7 +372,7 @@ def main():
             for fold in range(len(all_train_losses)):
                 for epoch in range(len(all_train_losses[fold])):
                     writer.writerow([
-                        config_id,
+                        name,
                         fold,
                         epoch + 1,  # 1-basiert wie im Report
                         round(all_train_losses[fold][epoch], 4),

@@ -11,6 +11,7 @@ import os
 from glob import glob
 from sklearn.utils.class_weight import compute_class_weight
 from collections import Counter
+import csv
 
 #kleine Veränderung bei EEGWDataset, da jetzt mehrere Daten in einer .pt Datei zusammengefasst, beschleunigt den Ladeprozess
 
@@ -277,7 +278,7 @@ def main():
             pos_weight = neg / pos
             pos_weight_tensor = torch.tensor([pos_weight], dtype=torch.float32).to(device)
 
-            model = CNN_EEG_1(in_channels=dataset[0][0].shape[0], n_classes=1, num_features).to(device)
+            model = CNN_EEG_1(in_channels=dataset[0][0].shape[0], n_classes=1, num_features= num_features).to(device)
             optimizer = torch.optim.Adam(model.parameters(), lr=lr)
             loss_fn = CombinedLoss(pos_weight=pos_weight_tensor, alpha_dice=0.7, alpha_focal=0.3) 
 
@@ -314,7 +315,7 @@ def main():
             all_f1_scores.append(fold_f1)
 
         # === SPEICHERN ===
-        save_path = os.path.join("models_testing", run_name)
+        save_path = os.path.join("models_newWin", run_name)
         os.makedirs(save_path, exist_ok=True)
 
         result_path = os.path.join(save_path, "results")
@@ -353,7 +354,7 @@ def main():
             for fold in range(len(all_train_losses)):
                 for epoch in range(len(all_train_losses[fold])):
                     writer.writerow([
-                        config_id,
+                        run_name,
                         fold,
                         epoch + 1,  # 1-basiert wie im Report
                         round(all_train_losses[fold][epoch], 4),

@@ -52,44 +52,59 @@ num_seizure_patients = sum([1 for pid in train_ids if patient_to_label[pid] == 1
 print("Seizure patients in training set:", num_seizure_patients)
 
 # === Datasets ===
+from torch.utils.data import Dataset
+import torch
+
 class EEGSequenceDataset(Dataset):
-    def __init__(self, ids, paths, labels, onset_mode=False, chunk_len=10, stride=10, pad_short_sequences=False):
-        self.samples = []
+    def __init__(self, ids, paths, labels=None, onset_mode=False, chunk_len=10, stride=10, cache_data=False):
         self.onset_mode = onset_mode
         self.chunk_len = chunk_len
-        self.pad_short_sequences = pad_short_sequences
+        self.paths = paths
+        self.sample_metadata = []
+        self.chunk_labels = []  # Only used if not onset_mode
+        self.cache_data = cache_data
+        self.data_cache = {} if cache_data else None
 
-        for pid in ids: 
+        for pid in ids:
             data = torch.load(paths[pid], map_location='cpu')
             windows = data["windows"]
-            total_len = windows.size(0)
+            window_labels = data["window_labels"]
+            n_windows = windows.size(0)
 
-            if onset_mode:
-                window_labels = data["window_labels"]
-            if total_len < chunk_len: 
-                if pad_short_sequences and onset_mode: 
-                    pad_len = chunk_len - total_len
-                    windows = torch.cat([windows, torch.zeros((pad_len, *windows.shape[1:]))], dim=0)
-                    window_labels = torch.cat([window_labels, torch.full((pad_len,), -100)])
-                    self.samples.append((windows, window_labels))
-                else:
-                    continue
-            else: 
-                for i in range(0, total_len - chunk_len + 1, stride):
-                    chunk = windows[i:i+chunk_len]
-                    if onset_mode:
-                        chunk_labels = window_labels[i:i+chunk_len]
-                        self.samples.append((chunk, chunk_labels))
-                    else:
-                        chunk_window_labels = data["window_labels"][i:i+chunk_len]
-                        seizure_label = 1 if (chunk_window_labels == 1).any() else 0
-                        self.samples.append((chunk, seizure_label))
+            for i in range(0, n_windows - chunk_len + 1, stride):
+                self.sample_metadata.append({
+                    "pid": pid,
+                    "start": i
+                })
+                if not onset_mode:
+                    chunk = window_labels[i:i + chunk_len]
+                    seizure_label = 1 if (chunk == 1).any() else 0
+                    self.chunk_labels.append(seizure_label)
+
+            if cache_data:
+                self.data_cache[pid] = data  # cache full patient file
 
     def __len__(self):
-        return len(self.samples)
+        return len(self.sample_metadata)
 
     def __getitem__(self, idx):
-        return self.samples[idx]
+        meta = self.sample_metadata[idx]
+        pid = meta["pid"]
+        start = meta["start"]
+
+        if self.cache_data:
+            data = self.data_cache[pid]
+        else:
+            data = torch.load(self.paths[pid], map_location='cpu')
+
+        chunk = data["windows"][start:start + self.chunk_len]
+
+        if self.onset_mode:
+            label_chunk = data["window_labels"][start:start + self.chunk_len]
+            return chunk, label_chunk
+        else:
+            seizure_label = self.chunk_labels[idx]
+            return chunk, seizure_label
 
 # === Collate Functions ===
 def collate_fn_detection(batch):
@@ -106,20 +121,20 @@ def collate_fn_onset(batch):
 # === Dataloaders ===
 train_dataset_det = EEGSequenceDataset(train_ids, patient_to_path, patient_to_label, onset_mode=False)
 test_dataset_det = EEGSequenceDataset(test_ids, patient_to_path, patient_to_label, onset_mode=False)
+print("Created Train and Test Datasets")
 
 
-# Get labels for all chunks
-chunk_labels = [label for _, label in train_dataset_det]
-# Assign weights inversely proportional to class frequency
+chunk_labels = train_dataset_det.chunk_labels
 label_counts = Counter(chunk_labels)
 weights = [1.0 / label_counts[label] for label in chunk_labels]
-# Create sampler
 sampler = WeightedRandomSampler(weights, num_samples=len(chunk_labels), replacement=True)
-# Use the sampler in DataLoader
-train_loader_det = DataLoader(train_dataset_det, batch_size=batch_size, sampler=sampler, collate_fn=collate_fn_detection)
-test_loader_det = DataLoader(test_dataset_det, batch_size=batch_size, collate_fn=collate_fn_detection)
 
-counter = Counter([label for _, label in train_dataset_det])
+# Use the sampler in DataLoader
+train_loader_det = DataLoader(train_dataset_det, batch_size=batch_size, sampler=sampler, collate_fn=collate_fn_detection, num_workers = 4, pin_memory = True)
+test_loader_det = DataLoader(test_dataset_det, batch_size=batch_size, collate_fn=collate_fn_detection, num_workers = 4)
+print("Loaded Train and Test Datasets")
+
+counter = Counter(train_dataset_det.chunk_labels)
 print("Training chunk class distribution:", counter)
 
 sample_input, _ = next(iter(train_loader_det))
@@ -133,9 +148,8 @@ detector = CNNTransformer_2D(
     per_window=False
 ).to(device)
 
-counts = Counter([patient_to_label[pid] for pid in train_ids])
-total = counts[0] + counts[1]
-weights = torch.tensor([1.0 / counts[0], 1.0 / counts[1]], dtype=torch.float32).to(device)
+label_counts = Counter(train_dataset_det.chunk_labels)
+weights = torch.tensor([1.0 / label_counts[0], 1.0 / label_counts[1]], dtype=torch.float32).to(device)
 
 criterion = torch.nn.CrossEntropyLoss(weight=weights)
 optimizer = torch.optim.Adam(detector.parameters(), lr=1e-3)
@@ -156,11 +170,11 @@ for epoch in range(1, num_epochs + 1):
     with torch.no_grad():
         for X, y in test_loader_det:
             batch_counts = Counter(y.cpu().numpy())
-            X = X.to(device)
+            X, y = X.to(device), y.to(device)
             out = detector(X)
             preds = out.argmax(1).cpu().numpy()
             all_preds.extend(preds)
-            all_targets.extend(y.numpy())
+            all_targets.extend(y.cpu().numpy())
 
     f1 = f1_score(all_targets, all_preds)
     acc = accuracy_score(all_targets, all_preds)
