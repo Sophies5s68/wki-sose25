@@ -20,7 +20,7 @@ from scipy import signal as sps
 import ruptures as rpt
 import torch 
 import torch.nn as nn
-from CNN_model_copy import CNN_EEG
+from CNN_model import CNN_EEG
 from new_preprocess import preprocess_signal_with_montages
 from features_predict import window_prediction, feature_extraction_window
 #from CNN_dataset import window_data_evaluate, create_fixed_grid_maps

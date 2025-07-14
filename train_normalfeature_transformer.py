@@ -192,46 +192,67 @@ for fold, (train_idx, test_idx) in enumerate(skf.split(patient_ids, labels_array
     train_loader_onset = DataLoader(train_dataset_onset, batch_size=batch_size, shuffle=True, collate_fn=collate_fn_onset)
     test_loader_onset = DataLoader(test_dataset_onset, batch_size=batch_size, shuffle=False, collate_fn=collate_fn_onset)
 
+    # === Model ===
     onset_model = CNNTransformerEEG(
         in_channels=sample_input.shape[2],
         in_features=sample_input.shape[3],
-        n_classes=2,
+        n_classes=1,
         per_window=True
     ).to(device)
 
-    criterion = torch.nn.CrossEntropyLoss(ignore_index=-100)
+    # === Compute pos_weight for BCEWithLogitsLoss ===
+    print("Computing class balance...")
+    all_labels = []
+    for _, y in train_dataset_onset:
+        valid = y[y != -100]
+        all_labels.extend(valid.tolist())
+
+    counter = Counter(all_labels)
+    pos = counter.get(1, 1)
+    neg = counter.get(0, 1)
+    pos_weight = torch.tensor([neg / pos], dtype=torch.float32, device=device)
+
+    criterion = nn.BCEWithLogitsLoss(pos_weight=pos_weight)
     optimizer = torch.optim.Adam(onset_model.parameters(), lr=1e-3)
 
+    # === Training Loop ===
     for epoch in range(1, num_epochs + 1):
         onset_model.train()
         for X, y in train_loader_onset:
             X, y = X.to(device), y.to(device)
+            mask = y != -100
+            y = y.float().unsqueeze(-1)  # (B, T, 1)
+
             optimizer.zero_grad()
-            out = onset_model(X)
-            loss = criterion(out.view(-1, 2), y.view(-1))
+            out = onset_model(X)  # (B, T, 1)
+            loss = criterion(out[mask], y[mask])
             loss.backward()
             optimizer.step()
 
+        # === Evaluation ===
         onset_model.eval()
         all_preds, all_targets, onset_errors = [], [], []
 
         with torch.no_grad():
             for X, y in test_loader_onset:
                 X, y = X.to(device), y.to(device)
-                out = onset_model(X)
-                preds = out.argmax(dim=-1)
                 mask = y != -100
+                y = y.float().unsqueeze(-1)
+
+                out = onset_model(X)  # (B, T, 1)
+                preds = (torch.sigmoid(out) > 0.5).long()  # (B, T, 1)
 
                 for b in range(X.size(0)):
                     pred_seq = preds[b][mask[b]]
-                    true_seq = y[b][mask[b]]
+                    true_seq = y[b][mask[b]].long().squeeze(-1)
+
                     if (pred_seq == 1).any() and (true_seq == 1).any():
                         pred_onset = (pred_seq == 1).nonzero(as_tuple=True)[0][0].item()
                         true_onset = (true_seq == 1).nonzero(as_tuple=True)[0][0].item()
                         onset_errors.append(abs(pred_onset - true_onset))
 
-                all_preds.extend(preds[mask].cpu().numpy())
-                all_targets.extend(y[mask].cpu().numpy())
+                all_preds.extend(preds[mask].cpu().numpy().flatten())
+                all_targets.extend(y[mask].cpu().numpy().flatten())
 
         f1 = f1_score(all_targets, all_preds)
         acc = accuracy_score(all_targets, all_preds)
