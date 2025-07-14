@@ -1,7 +1,9 @@
 import numpy as np
 import scipy.signal as sps
 from scipy.stats import entropy
-from antropy import perm_entropy
+
+
+# Datei um die Features zu berechnen zum Erstellen des Trainings Datensatzes
 
 bands = ({'delta' : [1,4],
           'theta' : [4, 8],
@@ -10,19 +12,10 @@ bands = ({'delta' : [1,4],
           'gamma' : [30,120]})  
 
 # Methode um EEG Signal in Windows einzuteilen
-
 def window_eeg_data(signal, resampled_fs, seizure_onset, seizure_offset, window_size, step_size):
-    """
-    Splits EEG signal into overlapping windows and assigns seizure labels.
 
-    Returns:
-    - windows: list of np arrays with shape (n_channels, window_samples)
-    - labels: list with 0 (no seizure) or 1 (seizure) per window
-    - timestamps: list with window start times in seconds
-    - used_whole_recording: True if recording was shorter than one window
-    """
     if signal.ndim != 2:
-        raise ValueError("Signal must be 2D with shape (n_channels, n_samples)")
+        raise ValueError("Signal muss 2D sein mit (channels,samples)")
 
     window_samples = int(window_size * resampled_fs)
     step_samples = int(step_size * resampled_fs)
@@ -33,10 +26,10 @@ def window_eeg_data(signal, resampled_fs, seizure_onset, seizure_offset, window_
     timestamps = []
     used_whole_recording = False
 
-    # Check if seizure interval is meaningful
+    # Prüfen ob Anfall vorhanden
     has_valid_seizure = not (seizure_onset == 0.0 and seizure_offset == 0.0)
 
-    # If recording is shorter than one window, use whole signal as one window
+    # Falls Signal kürzer als ein Fenster ist das gesamte Signal nutzen
     if n_samples < window_samples:
         windows.append(signal)
         timestamps.append(0.0)
@@ -52,7 +45,7 @@ def window_eeg_data(signal, resampled_fs, seizure_onset, seizure_offset, window_
         labels.append(label)
         return windows, labels, timestamps, used_whole_recording
 
-    # Normal sliding window
+    # Aufteilen des Signals in Fenster
     for start in range(0, n_samples - window_samples + 1, step_samples):
         end = start + window_samples
         window = signal[:, start:end]
@@ -71,7 +64,9 @@ def window_eeg_data(signal, resampled_fs, seizure_onset, seizure_offset, window_
 
     return windows, labels, timestamps, used_whole_recording
 
+'''
 # Windowing mit kleineren Windows während Anfällen um Samples für Anfälle zu steigern
+# nicht mehr verwendet
 
 def window_eeg_data_variable(signal, resampled_fs, seizure_onset, seizure_offset, 
                               normal_window_size, normal_step_size,
@@ -121,7 +116,8 @@ def window_eeg_data_variable(signal, resampled_fs, seizure_onset, seizure_offset
         current_time += step_size
 
     return windows, labels, timestamps
-
+'''
+# Berechnen der Indizes
 def get_band_indices(f):
     return {band: np.logical_and(f >= fmin, f <= fmax) for band, (fmin, fmax) in bands.items()}
 
@@ -129,11 +125,13 @@ def get_band_indices(f):
 def spectral_power(spectrum, idx_dict):
     return [np.nanmean(spectrum[idx]) if spectrum[idx].size > 0 else 0.0 for idx in idx_dict.values()]
 
+# Berechnen der durchschnittlichen Amplitude
 def mean_spectral_amplitude(spectrum, idx_dict):
     spectrum_clipped = np.clip(spectrum, 0, None)
     amp = np.sqrt(spectrum_clipped)
     return [np.nanmean(amp[idx]) if amp[idx].size > 0 else 0.0 for idx in idx_dict.values()]
 
+# Berechnen der spekatralen Entropie
 def spectral_entropy(f, spectrum, base=np.e):
     psd_norm = spectrum / np.sum(spectrum)
     psd_norm = np.clip(psd_norm, 1e-12, 1)
@@ -141,6 +139,7 @@ def spectral_entropy(f, spectrum, base=np.e):
     entropy_val = -np.sum(psd_norm * log_fn(psd_norm))
     return entropy_val / log_fn(len(psd_norm))
 
+# Berechnen der Hjorth Parameter
 def hjorthparameters(sig):
     sig = np.asarray(sig)
     first_deriv = np.diff(sig)
@@ -150,18 +149,21 @@ def hjorthparameters(sig):
     complexity = np.sqrt(np.var(second_deriv) / (np.var(first_deriv) + 1e-10)) / (mobility + 1e-10)
     return activity, mobility, complexity
 
+# Berechnen der funktionalen Dispersion
 def petrosian_fd(sig):
     N = len(sig)
     diff = np.diff(sig)
     N_delta = np.sum(diff[1:] * diff[:-1] < 0)
     return np.log10(N) / (np.log10(N) + np.log10(N / (N + 0.4 * N_delta))) if N_delta != 0 else 0.0
 
+# Über Features standardisieren um bessere Eingaben für CNN zu erzeugen
 def standardize_matrix(matr):
     mean = matr.mean(axis=0)
     std = matr.std(axis=0)
     std[std == 0] = 1
     return (matr - mean) / std
 
+# Methode um Features zu berechnen
 def feature_extraction_window(signals, fs):
     feature_matr = []
     for channel in signals:
@@ -179,25 +181,3 @@ def feature_extraction_window(signals, fs):
 
     return standardize_matrix(np.asarray(feature_matr))
 
-
-def window_prediction(signal, resampled_fs, window_size, step_size):
-
-    # Testet, ob Input in der richtigen Form ist 
-    if signal.ndim !=2: 
-        raise ValueError("Signal muss 2D sein, der Größe (n_channels, n_samples)")
-    window_samples = int(window_size * resampled_fs)
-    step_samples = int(step_size * resampled_fs)
-    n_channels, n_samples = signal.shape
-    
-    windows = []
-    timestamps = []
-    
-    for start in range(0, n_samples - window_samples + 1, step_samples):
-        end = start + window_samples
-        window = signal[:, start:end]
-        windows.append(window)
-        start_sec = start / resampled_fs
-        end_sec = end / resampled_fs
-        timestamps.append(start_sec)
-
-    return windows, timestamps

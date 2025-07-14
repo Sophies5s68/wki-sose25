@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import StratifiedGroupKFold
-from CNN_model_copy import CNN_EEG, train_model, evaluate_model  # Stelle sicher, dass du die Klasse separat speicherst
+from CNN_model import CNN_EEG, train_model, evaluate_model  # Stelle sicher, dass du die Klasse separat speicherst
 import numpy as np
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
@@ -12,9 +12,14 @@ from glob import glob
 from sklearn.utils.class_weight import compute_class_weight
 from collections import Counter
 import gc
+import csv
 
-#kleine Veränderung bei EEGWDataset, da jetzt mehrere Daten in einer .pt Datei zusammengefasst, beschleunigt den Ladeprozess
+# Datei zum Trainieren eines einzelnen Modells 
+# genutzt um einzelne Parameter auszuprobieren
 
+
+'''
+# Klasse zum lazy Loading des Datensatzes, nicht mehr genutzt
 class EEGWindowDatasetLazy(torch.utils.data.Dataset):
     def __init__(self, folder_path):
         self.file_paths = []
@@ -57,7 +62,11 @@ class EEGWindowDatasetLazy(torch.utils.data.Dataset):
         labels = [label for _, _, label, _ in self.index]
         groups = [eeg_id for _, _, _, eeg_id in self.index]
         return labels, groups
-    
+
+'''
+# Klasse zum einlesen der zuvor abgespeicherten extrahierten Features
+# in einer .pt Datei sind 1000 Samples
+
 class EEGWindowDatasetCombined(torch.utils.data.Dataset):
     def __init__(self, folder_path):
         self.samples = []
@@ -80,7 +89,11 @@ class EEGWindowDatasetCombined(torch.utils.data.Dataset):
         labels = [label for _, label, *_ in self.samples]
         groups = [eeg_id for _, _, eeg_id, *_ in self.samples]
         return labels, groups
-    
+
+'''
+# Klasse zum einlesen der .pt Datein
+# jeweils ein sample pro Datei
+# nicht mehr verwendet -> zusammenführen der Datein erlaubt schnelleres Laden
 class EEGWindowDatasetSingleFiles(torch.utils.data.Dataset):
     def __init__(self, folder_path):
         self.file_paths = []
@@ -112,8 +125,8 @@ class EEGWindowDatasetSingleFiles(torch.utils.data.Dataset):
             labels.append(label)
             groups.append(eeg_id)
         return labels, groups
-
-    
+'''
+# Berechnung des Dice Loss
 class DiceLoss(torch.nn.Module):
     def __init__(self, smooth=1e-6):
         super().__init__()
@@ -127,7 +140,8 @@ class DiceLoss(torch.nn.Module):
         dice = (2. * intersection + self.smooth) / (preds.sum() + targets.sum() + self.smooth)
         return 1 - dice
     
-# nur dice loss war zu instabil
+
+# kombiniertes Dice Loss mit BCE (nicht mehr verwendet)
 class CombinedDiceBCELoss(nn.Module):
     def __init__(self, weight_bce=0.5, weight_dice=0.5, pos_weight=None):
         super().__init__()
@@ -149,7 +163,9 @@ class CombinedDiceBCELoss(nn.Module):
         dice_loss = 1 - (2. * intersection + smooth) / (probs.sum() + targets.sum() + smooth)
 
         return self.weight_bce * bce_loss + self.weight_dice * dice_loss
-    
+
+
+# Berechnung des Focal Loss
 class FocalLossWithPosWeight(torch.nn.Module):
     def __init__(self, pos_weight=1.0, alpha=0.25, gamma=2.0):
         super().__init__()
@@ -160,21 +176,17 @@ class FocalLossWithPosWeight(torch.nn.Module):
     def forward(self, preds, targets):
         preds = preds.view(-1)
         targets = targets.view(-1)
-
-        # Sigmoid probs
         probas = torch.sigmoid(preds)
-
-        # Berechne BCE mit pos_weight manuell:
         bce_pos = - self.pos_weight * targets * torch.log(probas + 1e-8)
         bce_neg = - (1 - targets) * torch.log(1 - probas + 1e-8)
         bce = bce_pos + bce_neg
-
-        pt = torch.exp(-bce)  # pt wie in Focal Loss
-
+        pt = torch.exp(-bce)
         focal_loss = self.alpha * (1 - pt) ** self.gamma * bce
-
         return focal_loss.mean()
-
+    
+    
+# Kombinierte Loss-Funktion aus Dice Loss und Focal Loss
+# Bessere Performance und Stabilität als einzelne Nutzung
 class CombinedLoss(torch.nn.Module):
     def __init__(self, pos_weight=1.0, alpha_dice=0.5, alpha_focal=0.5, focal_alpha=0.25, focal_gamma=2.0):
         super().__init__()
@@ -189,6 +201,8 @@ class CombinedLoss(torch.nn.Module):
         return self.alpha_dice * loss_dice + self.alpha_focal * loss_focal
     
     
+# Early Stopping des Trainings
+# Über F1 Score, keine Verbesserung über 5 Epochen führt zu Abbruch
 class EarlyStopping:
     def __init__(self, patience=5, verbose=False, delta=0.0):
         self.patience = patience
@@ -215,22 +229,15 @@ class EarlyStopping:
             self.best_score = score
             self.best_model_state = model.state_dict()
             self.counter = 0
-            
-class SubsetDataset(Dataset):
-    def __init__(self, base_dataset, indices):
-        self.base_dataset = base_dataset
-        self.indices = indices
 
-    def __len__(self):
-        return len(self.indices)
 
-    def __getitem__(self, idx):
-        return self.base_dataset[self.indices[idx]]
             
 def main():
-    data_folder = "add_dataset/combined/win4_step1/" 
-    run_name = "new_window_function"  
-
+    
+    data_folder = "data_new_window/win4_step1/" 
+    run_name = "SGD_opt"
+    
+    # Standard Parameter
     epochs = 50
     batch_size = 512
     lr = 1e-4
@@ -248,6 +255,7 @@ def main():
     torch.backends.cudnn.benchmark = True
     print("loaded")
 
+    # Stratified splitting anhand der Patienten-IDs um sicherzustellen dass keine Überschneidung zwischen Test und Val
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
 
     all_confusion_matrices = []
@@ -261,9 +269,9 @@ def main():
         print(f"========== FOLD {i} ==========")
 
         train_loader = DataLoader(Subset(dataset, train_idx), batch_size=batch_size, shuffle=True,
-                                  num_workers=16, pin_memory=True, persistent_workers=False)
+                                  num_workers=8, pin_memory=True, persistent_workers=True)
         val_loader = DataLoader(Subset(dataset, val_idx), batch_size=batch_size, shuffle=False,
-                                num_workers=16, pin_memory=True)
+                                num_workers=8, pin_memory=True)
 
         train_labels = [labels[idx] for idx in train_idx]
         counter = Counter(train_labels)
@@ -274,7 +282,10 @@ def main():
         model = CNN_EEG(in_channels=dataset[0][0].shape[0], n_classes=1).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         loss_fn = CombinedLoss(pos_weight=pos_weight_tensor, alpha_dice=0.7, alpha_focal=0.3) 
-
+        #loss_fn = CombinedLoss(pos_weight=pos_weight_tensor, alpha_dice=0.5, alpha_focal=0.5)
+       
+        
+        
         early_stopper = EarlyStopping(patience=5, verbose=True)
 
         fold_train_losses = []
@@ -307,15 +318,15 @@ def main():
         all_val_accuracies.append(fold_test_accuracies)
         all_f1_scores.append(fold_f1)
         
-        #Speicherplatz nach jedem Fold wieder freigeben
+        # Speicherplatz nach jedem Fold wieder freigeben
         del train_loader
         del val_loader
         del model
         torch.cuda.empty_cache()  # wenn CUDA verwendet wird
         gc.collect()
         
-    # === SPEICHERN ===
-    save_path = os.path.join("models_testing", run_name)
+    # Abspeichern der Modelle
+    save_path = os.path.join("models_newWin", run_name)
     os.makedirs(save_path, exist_ok=True)
 
     result_path = os.path.join(save_path, "results")
@@ -324,6 +335,7 @@ def main():
     for fold, state_dict in enumerate(all_best_model_states):
         torch.save(state_dict, os.path.join(save_path, f"best_model_fold{fold}.pth"))
 
+    # Abspeichern der Epochenergebnisse als txt-Datei für schnelleres Anschauen
     report_path = os.path.join(result_path, "training_report.txt")
     with open(report_path, "w") as f:
         for fold in range(len(all_train_losses)):
@@ -342,7 +354,7 @@ def main():
             f.write("Confusion Matrix last epoch:\n")
             f.write(np.array2string(all_confusion_matrices[fold], separator=', ') + "\n")
             
-    # === CSVs ===
+    # Abspeichern der Epochenergebnisse als csv Datei
     csv_path = os.path.join(result_path, "training_metrics.csv")
     with open(csv_path, "w", newline="") as csvfile:
         writer = csv.writer(csvfile)
@@ -354,9 +366,9 @@ def main():
         for fold in range(len(all_train_losses)):
             for epoch in range(len(all_train_losses[fold])):
                 writer.writerow([
-                    config_id,
+                    run_name,
                     fold,
-                    epoch + 1,  # 1-basiert wie im Report
+                    epoch + 1,  
                     round(all_train_losses[fold][epoch], 4),
                     round(all_train_accuracies[fold][epoch], 4),
                     round(all_val_accuracies[fold][epoch], 4),

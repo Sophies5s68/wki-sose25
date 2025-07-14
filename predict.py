@@ -22,7 +22,7 @@ import torch
 import torch.nn as nn
 from CNN_model_copy import CNN_EEG
 from new_preprocess import preprocess_signal_with_montages
-from faster_features import window_prediction, feature_extraction_window
+from features_predict import window_prediction, feature_extraction_window
 #from CNN_dataset import window_data_evaluate, create_fixed_grid_maps
 from glob import glob
 from scipy.signal import iirnotch, butter, sosfiltfilt, resample_poly, tf2sos
@@ -114,7 +114,8 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     return prediction # Dictionary mit prediction - Muss unverändert bleiben!
                                
                                
-        
+# Methode die mit den 5 abgespeicherten Modellen einen Mehreheitsentscheid macht
+# 5 Modelle aus Stratified Fold für robustere Vorhersage
 def predictions_ensemble(data_for_class: List[torch.Tensor], model_name: str, device: torch.device) -> List[float]:
     file_paths = sorted([os.path.join(model_name, f) for f in os.listdir(model_name) if f.endswith(".pth")])
     batch_tensor = torch.stack(data_for_class).to(device)

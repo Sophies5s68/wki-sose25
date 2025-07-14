@@ -2,8 +2,9 @@ import numpy as np
 import scipy.signal as sps
 from wettbewerb import get_6montages
 
-# Resampling, um Data auf die gleiche Samplingrate zu bringen
+# Datei zum Vorverarbeiten der Daten
 
+# Resampling, um Data auf die gleiche Samplingrate zu bringen
 def resample_signal(sig, original_fs, target_fs=256):
     if original_fs == target_fs:
         return sig
@@ -15,8 +16,8 @@ def resample_signal(sig, original_fs, target_fs=256):
     else:
         raise ValueError("Signal muss 1D oder 2D sein.")
 
+        
 # Notch IIR Filter, um die Netzfrequenz rauszufiltern 
-
 def notch_filter_iir_filtfilt(sig, fs, freq=50.0, Q=30.0):
     w0 = freq / (fs / 2)
     b, a = sps.iirnotch(w0, Q)
@@ -29,7 +30,6 @@ def notch_filter_iir_filtfilt(sig, fs, freq=50.0, Q=30.0):
 
         
 # Bandpassfilter mit einem IIR Butterworth - Filter 
-
 def bandpass_filter_iir_filtfilt(sig, fs, lowcut=1.0, highcut=120.0, order=4):
     nyquist = 0.5 * fs
     low = lowcut / nyquist
@@ -41,6 +41,7 @@ def bandpass_filter_iir_filtfilt(sig, fs, lowcut=1.0, highcut=120.0, order=4):
         return np.vstack([sps.filtfilt(b, a, sig[ch]) for ch in range(sig.shape[0])])
     else:
         raise ValueError("Signal must be 1D or 2D.")
+
 
 def preprocess_signal_with_montages(channels, data, target_fs, original_fs, ids=0):
     # Holt die 6 Montagen aus dem Datensatz

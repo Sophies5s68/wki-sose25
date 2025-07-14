@@ -160,3 +160,4 @@ raw_dataset/
 LSTM/tensor_batches/
 scalogram_dataset/
 data_new_window/
+window_datasets/

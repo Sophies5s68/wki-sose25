@@ -4,7 +4,9 @@ from new_features import window_eeg_data, feature_extraction_window
 import os, torch
 import numpy as np
 
-# Define the window and step size combinations
+# Datei zum erstellen von Datensätzen, die anschließend für das Training verwednet werden
+
+# Definieren der Fensterparameter (window_size,step_size)
 window_step_configs = [(4,1)]
 
 dataset = EEGDataset("../shared_data/training")
@@ -41,7 +43,7 @@ for window_size, step_size in window_step_configs:
         for idx, (window, lbl, ts) in enumerate(zip(windows, labels, timestamps)):
             features = feature_extraction_window(window, new_fs)
             save_path = os.path.join(save_folder, f"{eeg_id}_win{idx}_lbl{lbl}.pt")
-            torch.save((features, lbl, eeg_id, ts), save_path)
+            torch.save((features, lbl, eeg_id, ts, seizure_onset), save_path)
 
         print(f"[{i+1}/{len(dataset)}] Processed {eeg_id} with {len(windows)} windows.", end='\r')
 
