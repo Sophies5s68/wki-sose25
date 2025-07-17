@@ -359,6 +359,8 @@ def features_prediction_grouped(signals: np.ndarray, fs: float, stft_window_size
         feature_matrix.append(np.asarray(features))
 
     feature_matrix = np.asarray(feature_matrix)  # (n_channels, 15)
+    feature_matrix = standardize_matrix(feature_matrix)
+   
     assert feature_matrix.shape == (6, 15), f"Expected (6,15), got {feature_matrix.shape}"
 
     # Gruppieren: Transponieren → (15, 6)

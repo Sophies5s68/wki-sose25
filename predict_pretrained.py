@@ -16,8 +16,8 @@ import time
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Predict given Model')
-    parser.add_argument('--test_dir', action='store',type=str,default='../test/')
-    parser.add_argument('--model_name', action='store',type=str,default='model.json')
+    parser.add_argument('--test_dir', action='store',type=str,default='../shared_data/training_mini')
+    parser.add_argument('--model_name', action='store',type=str,default='wki-sose25/model_abgabe/')
     parser.add_argument('--allow_fail',action='store_true',default=False)
     args = parser.parse_args()
     
@@ -35,6 +35,8 @@ if __name__ == '__main__':
             _prediction = predict_labels(channels,data,fs,ref_system,model_name=args.model_name)
             _prediction["id"] = id
             predictions.append(_prediction)
+            print(prediction)
+            print(label)
         except:
             if args.allow_fail:
                 raise
