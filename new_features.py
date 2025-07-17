@@ -2,6 +2,7 @@ import numpy as np
 import scipy.signal as sps
 from scipy.stats import entropy
 from scipy.signal import stft
+import torch
 
 # ---- Datei um die Features zu berechnen zum Erstellen des Trainings Datensatzes ----
 
@@ -312,3 +313,77 @@ def features_prediction(signals, fs, stft_window_size, stft_overlap):
 
     matrix = np.asarray(feature_matr)
     return standardize_matrix(matrix)
+
+def features_prediction_grouped(signals: np.ndarray, fs: float, stft_window_size: float, stft_overlap: float) -> torch.Tensor:
+    '''
+    Gibt die gruppierten Features zurück, wie sie für das CNN im Format (4, 5, 6) erwartet werden.
+    
+    Inputs:
+    - signals: (n_channels, n_samples)
+    - fs: Sampling Rate
+    - stft_window_size: STFT Fenstergröße in Sekunden
+    - stft_overlap: Überlappung (0–1)
+
+    Output:
+    - torch.Tensor der Form (4 Gruppen, max 5 Features, 6 Kanäle)
+    '''
+
+    n_channels, n_samples = signals.shape
+    nperseg = int(stft_window_size * fs)
+    noverlap = int(nperseg * stft_overlap)
+    feature_matrix = []
+
+    for channel in signals:
+        if np.all(channel == 0) or np.isnan(channel).any() or np.isinf(channel).any():
+            feature_matrix.append(np.zeros(15))  # 5+5+3+1+1 = 15 Features
+            continue
+
+        # STFT → Spektrum
+        f, _, Zxx = sps.stft(channel, fs=fs, nperseg=nperseg, noverlap=noverlap)
+        psd = np.abs(Zxx) ** 2
+        avg_spectrum = np.mean(psd, axis=1)
+
+        idx_dict = get_band_indices(f)
+        spectral_pwr = spectral_power(avg_spectrum, idx_dict)
+        mean_amp = mean_spectral_amplitude(avg_spectrum, idx_dict)
+
+        try:
+            hjorth_act, hjorth_mob, hjorth_comp = hjorthparameters(channel)
+            spec_ent = spectral_entropy(f, avg_spectrum)
+            pfd = petrosian_fd(channel)
+        except:
+            hjorth_act, hjorth_mob, hjorth_comp, spec_ent, pfd = [0.0] * 5
+
+        # Reihenfolge: 5x Power, 5x Amplitude, 3x Hjorth, 1x Entropie, 1x PFD = 15
+        features = spectral_pwr + mean_amp + [hjorth_act, hjorth_mob, hjorth_comp, spec_ent, pfd]
+        feature_matrix.append(np.asarray(features))
+
+    feature_matrix = np.asarray(feature_matrix)  # (n_channels, 15)
+    assert feature_matrix.shape == (6, 15), f"Expected (6,15), got {feature_matrix.shape}"
+
+    # Gruppieren: Transponieren → (15, 6)
+    features_t = feature_matrix.T
+
+    # Aufteilen in Gruppen
+    groups = [
+        features_t[0:5],    # Gruppe 1: Spektral Power
+        features_t[5:10],   # Gruppe 2: Mittlere Amplituden
+        features_t[10:13],  # Gruppe 3: Hjorth
+        features_t[13:15],  # Gruppe 4: Entropie, PFD
+    ]
+
+    max_len = max(g.shape[0] for g in groups)  # = 5
+    n_channels = groups[0].shape[1]            # = 6
+
+    padded_groups = []
+    for g in groups:
+        pad_size = max_len - g.shape[0]
+        if pad_size > 0:
+            pad = np.zeros((pad_size, n_channels), dtype=g.dtype)
+            g_padded = np.vstack([g, pad])
+        else:
+            g_padded = g
+        padded_groups.append(torch.tensor(g_padded, dtype=torch.float32))
+
+    # (4, 5, 6)
+    return torch.stack(padded_groups, dim=0)

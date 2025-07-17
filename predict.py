@@ -22,7 +22,7 @@ import torch
 import torch.nn as nn
 from CNN_model import CNN_EEG
 from new_preprocess import preprocess_signal_with_montages
-from new_features import window_prediction, features_prediction
+from new_features import window_prediction, features_prediction_grouped
 #from CNN_dataset import window_data_evaluate, create_fixed_grid_maps
 from glob import glob
 from scipy.signal import iirnotch, butter, sosfiltfilt, resample_poly, tf2sos
@@ -76,14 +76,14 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     
     montage_names, montage_data, montage_missing,target_fs = preprocess_signal_with_montages(channels, data,target_fs,original_fs) 
     
-    windows, timestamps = window_prediction(montage_data, target_fs, window_size, step_size)
+    windows, timestamps, used = window_prediction(montage_data, target_fs, window_size, step_size)
     data_for_class = []
     # Feature extraction and brain map calculation
     for win in windows:
-        features = features_prediction(win, fs, stft_window_size, stft_overlap) # shape: (n_channels, n_features)
+        features = features_prediction_grouped(win, fs, stft_window_size, stft_overlap) # shape: (n_channels, n_features)
         assert not np.isnan(features).any(), "NaN in features!"
-        x = torch.tensor(features, dtype = torch.float)
-        data_for_class.append(x)
+        #x = torch.tensor(features, dtype = torch.float)
+        data_for_class.append(features)
         
     # Notfallprüfung
     if len(data_for_class) == 0:
@@ -117,6 +117,7 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
                                
 # Methode die mit den 5 abgespeicherten Modellen einen Mehreheitsentscheid macht
 # 5 Modelle aus Stratified Fold für robustere Vorhersage
+
 def predictions_ensemble(data_for_class: List[torch.Tensor], model_name: str, device: torch.device) -> List[float]:
     file_paths = sorted([os.path.join(model_name, f) for f in os.listdir(model_name) if f.endswith(".pth")])
     batch_tensor = torch.stack(data_for_class).to(device)
@@ -125,6 +126,7 @@ def predictions_ensemble(data_for_class: List[torch.Tensor], model_name: str, de
     with torch.no_grad():
         for path in file_paths:
             model = CNN_EEG_Conv2d_muster(4, 1).to(device)
+            #model = CNN_EEG(6,1).to(device)
             model.load_state_dict(torch.load(path, map_location=device))
             model.eval()
             outputs = torch.sigmoid(model(batch_tensor)).squeeze(1)
