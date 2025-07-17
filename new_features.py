@@ -222,7 +222,7 @@ def standardize_matrix(matr):
 
 ## Methode um Features zu berechnen, Spektrum wird mit Welch-Methode berechnet ##
 def feature_extraction_window(signals, fs):
-        '''
+    '''
     Extrahiert frequenz- und zeitraumbasierte Merkmale aus einem mehrkanaligen EEG-Fenster.
 
     Inputs:
