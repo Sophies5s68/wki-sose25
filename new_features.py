@@ -261,8 +261,7 @@ def feature_extraction_window(signals, fs):
 
 
 ## Methode um Features des gefensterten EEG-Signals zu extrahieren, wird mit STFT verwendet, um Laufzeit zu verbessern ##
-def features_prediction(signals, fs, stft_window_size, stft_overlap):t
-
+def features_prediction(signals, fs, stft_window_size, stft_overlap):
     '''
     Extrahiert frequenz- und zeitraumbasierte Merkmale aus einem mehrkanaligen EEG-Fenster.
     
