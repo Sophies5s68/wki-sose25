@@ -28,3 +28,7 @@ nochmal wegen Fehler in Windowing:
     Parameter --> läuft durch
     actiavtion --> läuft durch
     flat 
+    
+    
+    
+   

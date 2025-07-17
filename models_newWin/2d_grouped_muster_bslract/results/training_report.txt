@@ -1,0 +1,165 @@
+
+========== FOLD 0 ==========
+Epoch 01: Train Loss=0.5373 | Train Acc=0.9174 | Val Acc=0.9287 | F1=0.4912
+Epoch 02: Train Loss=0.4210 | Train Acc=0.9588 | Val Acc=0.9367 | F1=0.5285
+Epoch 03: Train Loss=0.3743 | Train Acc=0.9650 | Val Acc=0.9378 | F1=0.5326
+Epoch 04: Train Loss=0.3491 | Train Acc=0.9682 | Val Acc=0.9387 | F1=0.5335
+Epoch 05: Train Loss=0.3305 | Train Acc=0.9700 | Val Acc=0.9385 | F1=0.5440
+Epoch 06: Train Loss=0.3177 | Train Acc=0.9713 | Val Acc=0.9383 | F1=0.5452
+Epoch 07: Train Loss=0.3074 | Train Acc=0.9723 | Val Acc=0.9378 | F1=0.5472
+Epoch 08: Train Loss=0.2999 | Train Acc=0.9729 | Val Acc=0.9378 | F1=0.5472
+Epoch 09: Train Loss=0.2918 | Train Acc=0.9737 | Val Acc=0.9402 | F1=0.5473
+Epoch 10: Train Loss=0.2864 | Train Acc=0.9743 | Val Acc=0.9380 | F1=0.5355
+Epoch 11: Train Loss=0.2809 | Train Acc=0.9748 | Val Acc=0.9395 | F1=0.5346
+Epoch 12: Train Loss=0.2759 | Train Acc=0.9752 | Val Acc=0.9400 | F1=0.5498
+Epoch 13: Train Loss=0.2722 | Train Acc=0.9756 | Val Acc=0.9385 | F1=0.5435
+Epoch 14: Train Loss=0.2681 | Train Acc=0.9760 | Val Acc=0.9400 | F1=0.5399
+Epoch 15: Train Loss=0.2662 | Train Acc=0.9761 | Val Acc=0.9392 | F1=0.5555
+Epoch 16: Train Loss=0.2630 | Train Acc=0.9764 | Val Acc=0.9403 | F1=0.5441
+Epoch 17: Train Loss=0.2592 | Train Acc=0.9768 | Val Acc=0.9386 | F1=0.5471
+Epoch 18: Train Loss=0.2581 | Train Acc=0.9768 | Val Acc=0.9402 | F1=0.5499
+Epoch 19: Train Loss=0.2554 | Train Acc=0.9772 | Val Acc=0.9389 | F1=0.5500
+Epoch 20: Train Loss=0.2540 | Train Acc=0.9773 | Val Acc=0.9409 | F1=0.5441
+
+--- Final Metrics ---
+Final Train Acc: 0.9773
+Final Val Acc:   0.9409
+Final F1 Score:  0.5441
+Confusion Matrix letzte Epoche:
+[[542065,  14751],
+ [ 20623,  21107]]
+
+========== FOLD 1 ==========
+Epoch 01: Train Loss=0.5161 | Train Acc=0.9200 | Val Acc=0.9499 | F1=0.4421
+Epoch 02: Train Loss=0.4035 | Train Acc=0.9568 | Val Acc=0.9540 | F1=0.4918
+Epoch 03: Train Loss=0.3591 | Train Acc=0.9632 | Val Acc=0.9543 | F1=0.5065
+Epoch 04: Train Loss=0.3327 | Train Acc=0.9664 | Val Acc=0.9561 | F1=0.5077
+Epoch 05: Train Loss=0.3156 | Train Acc=0.9683 | Val Acc=0.9560 | F1=0.5293
+Epoch 06: Train Loss=0.3030 | Train Acc=0.9699 | Val Acc=0.9537 | F1=0.5204
+Epoch 07: Train Loss=0.2927 | Train Acc=0.9708 | Val Acc=0.9570 | F1=0.5233
+Epoch 08: Train Loss=0.2844 | Train Acc=0.9717 | Val Acc=0.9561 | F1=0.5261
+Epoch 09: Train Loss=0.2788 | Train Acc=0.9724 | Val Acc=0.9575 | F1=0.5391
+Epoch 10: Train Loss=0.2732 | Train Acc=0.9728 | Val Acc=0.9576 | F1=0.5283
+Epoch 11: Train Loss=0.2670 | Train Acc=0.9735 | Val Acc=0.9586 | F1=0.5369
+Epoch 12: Train Loss=0.2641 | Train Acc=0.9738 | Val Acc=0.9582 | F1=0.5370
+Epoch 13: Train Loss=0.2594 | Train Acc=0.9743 | Val Acc=0.9578 | F1=0.5308
+Epoch 14: Train Loss=0.2558 | Train Acc=0.9747 | Val Acc=0.9582 | F1=0.5394
+Epoch 15: Train Loss=0.2523 | Train Acc=0.9749 | Val Acc=0.9578 | F1=0.5407
+Epoch 16: Train Loss=0.2502 | Train Acc=0.9753 | Val Acc=0.9606 | F1=0.5459
+Epoch 17: Train Loss=0.2472 | Train Acc=0.9755 | Val Acc=0.9602 | F1=0.5433
+Epoch 18: Train Loss=0.2453 | Train Acc=0.9758 | Val Acc=0.9594 | F1=0.5395
+Epoch 19: Train Loss=0.2436 | Train Acc=0.9759 | Val Acc=0.9582 | F1=0.5353
+Epoch 20: Train Loss=0.2418 | Train Acc=0.9761 | Val Acc=0.9586 | F1=0.5374
+Epoch 21: Train Loss=0.2400 | Train Acc=0.9763 | Val Acc=0.9611 | F1=0.5519
+Epoch 22: Train Loss=0.2373 | Train Acc=0.9766 | Val Acc=0.9593 | F1=0.5420
+Epoch 23: Train Loss=0.2367 | Train Acc=0.9766 | Val Acc=0.9595 | F1=0.5480
+Epoch 24: Train Loss=0.2349 | Train Acc=0.9769 | Val Acc=0.9586 | F1=0.5410
+Epoch 25: Train Loss=0.2327 | Train Acc=0.9771 | Val Acc=0.9596 | F1=0.5446
+Epoch 26: Train Loss=0.2320 | Train Acc=0.9770 | Val Acc=0.9571 | F1=0.5359
+
+--- Final Metrics ---
+Final Train Acc: 0.9770
+Final Val Acc:   0.9571
+Final F1 Score:  0.5359
+Confusion Matrix letzte Epoche:
+[[661081,  15612],
+ [ 14777,  17544]]
+
+========== FOLD 2 ==========
+Epoch 01: Train Loss=0.5227 | Train Acc=0.9156 | Val Acc=0.9473 | F1=0.4886
+Epoch 02: Train Loss=0.4077 | Train Acc=0.9559 | Val Acc=0.9569 | F1=0.5156
+Epoch 03: Train Loss=0.3622 | Train Acc=0.9627 | Val Acc=0.9522 | F1=0.5023
+Epoch 04: Train Loss=0.3358 | Train Acc=0.9660 | Val Acc=0.9496 | F1=0.5068
+Epoch 05: Train Loss=0.3191 | Train Acc=0.9680 | Val Acc=0.9540 | F1=0.5143
+Epoch 06: Train Loss=0.3056 | Train Acc=0.9697 | Val Acc=0.9562 | F1=0.5277
+Epoch 07: Train Loss=0.2960 | Train Acc=0.9708 | Val Acc=0.9573 | F1=0.5289
+Epoch 08: Train Loss=0.2880 | Train Acc=0.9713 | Val Acc=0.9540 | F1=0.5286
+Epoch 09: Train Loss=0.2805 | Train Acc=0.9723 | Val Acc=0.9562 | F1=0.5397
+Epoch 10: Train Loss=0.2758 | Train Acc=0.9728 | Val Acc=0.9560 | F1=0.5383
+Epoch 11: Train Loss=0.2712 | Train Acc=0.9734 | Val Acc=0.9570 | F1=0.5406
+Epoch 12: Train Loss=0.2659 | Train Acc=0.9737 | Val Acc=0.9550 | F1=0.5358
+Epoch 13: Train Loss=0.2619 | Train Acc=0.9742 | Val Acc=0.9576 | F1=0.5454
+Epoch 14: Train Loss=0.2588 | Train Acc=0.9746 | Val Acc=0.9582 | F1=0.5470
+Epoch 15: Train Loss=0.2563 | Train Acc=0.9748 | Val Acc=0.9562 | F1=0.5437
+Epoch 16: Train Loss=0.2524 | Train Acc=0.9751 | Val Acc=0.9588 | F1=0.5515
+Epoch 17: Train Loss=0.2502 | Train Acc=0.9754 | Val Acc=0.9556 | F1=0.5382
+Epoch 18: Train Loss=0.2474 | Train Acc=0.9757 | Val Acc=0.9584 | F1=0.5509
+Epoch 19: Train Loss=0.2448 | Train Acc=0.9759 | Val Acc=0.9575 | F1=0.5484
+Epoch 20: Train Loss=0.2438 | Train Acc=0.9762 | Val Acc=0.9582 | F1=0.5472
+Epoch 21: Train Loss=0.2428 | Train Acc=0.9763 | Val Acc=0.9588 | F1=0.5520
+Epoch 22: Train Loss=0.2392 | Train Acc=0.9765 | Val Acc=0.9600 | F1=0.5573
+Epoch 23: Train Loss=0.2384 | Train Acc=0.9766 | Val Acc=0.9591 | F1=0.5573
+Epoch 24: Train Loss=0.2362 | Train Acc=0.9769 | Val Acc=0.9578 | F1=0.5530
+Epoch 25: Train Loss=0.2356 | Train Acc=0.9770 | Val Acc=0.9589 | F1=0.5551
+Epoch 26: Train Loss=0.2342 | Train Acc=0.9771 | Val Acc=0.9595 | F1=0.5583
+Epoch 27: Train Loss=0.2330 | Train Acc=0.9772 | Val Acc=0.9610 | F1=0.5637
+Epoch 28: Train Loss=0.2319 | Train Acc=0.9773 | Val Acc=0.9596 | F1=0.5578
+Epoch 29: Train Loss=0.2298 | Train Acc=0.9774 | Val Acc=0.9605 | F1=0.5587
+Epoch 30: Train Loss=0.2289 | Train Acc=0.9774 | Val Acc=0.9594 | F1=0.5556
+Epoch 31: Train Loss=0.2274 | Train Acc=0.9778 | Val Acc=0.9589 | F1=0.5570
+Epoch 32: Train Loss=0.2274 | Train Acc=0.9777 | Val Acc=0.9586 | F1=0.5563
+
+--- Final Metrics ---
+Final Train Acc: 0.9777
+Final Val Acc:   0.9586
+Final F1 Score:  0.5563
+Confusion Matrix letzte Epoche:
+[[644940,  14380],
+ [ 14262,  17953]]
+
+========== FOLD 3 ==========
+Epoch 01: Train Loss=0.5248 | Train Acc=0.9187 | Val Acc=0.9377 | F1=0.5138
+Epoch 02: Train Loss=0.4102 | Train Acc=0.9582 | Val Acc=0.9454 | F1=0.5340
+Epoch 03: Train Loss=0.3642 | Train Acc=0.9646 | Val Acc=0.9420 | F1=0.5319
+Epoch 04: Train Loss=0.3395 | Train Acc=0.9672 | Val Acc=0.9465 | F1=0.5446
+Epoch 05: Train Loss=0.3212 | Train Acc=0.9694 | Val Acc=0.9487 | F1=0.5573
+Epoch 06: Train Loss=0.3090 | Train Acc=0.9707 | Val Acc=0.9478 | F1=0.5560
+Epoch 07: Train Loss=0.2989 | Train Acc=0.9715 | Val Acc=0.9478 | F1=0.5462
+Epoch 08: Train Loss=0.2898 | Train Acc=0.9727 | Val Acc=0.9470 | F1=0.5575
+Epoch 09: Train Loss=0.2844 | Train Acc=0.9733 | Val Acc=0.9496 | F1=0.5702
+Epoch 10: Train Loss=0.2779 | Train Acc=0.9738 | Val Acc=0.9481 | F1=0.5670
+Epoch 11: Train Loss=0.2730 | Train Acc=0.9743 | Val Acc=0.9469 | F1=0.5546
+Epoch 12: Train Loss=0.2686 | Train Acc=0.9747 | Val Acc=0.9502 | F1=0.5757
+Epoch 13: Train Loss=0.2646 | Train Acc=0.9752 | Val Acc=0.9489 | F1=0.5702
+Epoch 14: Train Loss=0.2609 | Train Acc=0.9757 | Val Acc=0.9516 | F1=0.5748
+Epoch 15: Train Loss=0.2581 | Train Acc=0.9760 | Val Acc=0.9483 | F1=0.5597
+Epoch 16: Train Loss=0.2553 | Train Acc=0.9762 | Val Acc=0.9497 | F1=0.5726
+Epoch 17: Train Loss=0.2522 | Train Acc=0.9765 | Val Acc=0.9494 | F1=0.5723
+
+--- Final Metrics ---
+Final Train Acc: 0.9765
+Final Val Acc:   0.9494
+Final F1 Score:  0.5723
+Confusion Matrix letzte Epoche:
+[[547229,  14555],
+ [ 15708,  20248]]
+
+========== FOLD 4 ==========
+Epoch 01: Train Loss=0.5294 | Train Acc=0.9195 | Val Acc=0.9273 | F1=0.5189
+Epoch 02: Train Loss=0.4138 | Train Acc=0.9588 | Val Acc=0.9471 | F1=0.5696
+Epoch 03: Train Loss=0.3678 | Train Acc=0.9646 | Val Acc=0.9489 | F1=0.5772
+Epoch 04: Train Loss=0.3423 | Train Acc=0.9676 | Val Acc=0.9511 | F1=0.5898
+Epoch 05: Train Loss=0.3247 | Train Acc=0.9696 | Val Acc=0.9450 | F1=0.5748
+Epoch 06: Train Loss=0.3115 | Train Acc=0.9710 | Val Acc=0.9488 | F1=0.5795
+Epoch 07: Train Loss=0.3008 | Train Acc=0.9719 | Val Acc=0.9518 | F1=0.6047
+Epoch 08: Train Loss=0.2927 | Train Acc=0.9729 | Val Acc=0.9514 | F1=0.5996
+Epoch 09: Train Loss=0.2859 | Train Acc=0.9735 | Val Acc=0.9527 | F1=0.5931
+Epoch 10: Train Loss=0.2793 | Train Acc=0.9743 | Val Acc=0.9516 | F1=0.6092
+Epoch 11: Train Loss=0.2737 | Train Acc=0.9748 | Val Acc=0.9509 | F1=0.6015
+Epoch 12: Train Loss=0.2696 | Train Acc=0.9751 | Val Acc=0.9545 | F1=0.6071
+Epoch 13: Train Loss=0.2647 | Train Acc=0.9757 | Val Acc=0.9545 | F1=0.6147
+Epoch 14: Train Loss=0.2604 | Train Acc=0.9761 | Val Acc=0.9523 | F1=0.6090
+Epoch 15: Train Loss=0.2592 | Train Acc=0.9762 | Val Acc=0.9545 | F1=0.6223
+Epoch 16: Train Loss=0.2554 | Train Acc=0.9765 | Val Acc=0.9542 | F1=0.6122
+Epoch 17: Train Loss=0.2534 | Train Acc=0.9767 | Val Acc=0.9526 | F1=0.6113
+Epoch 18: Train Loss=0.2504 | Train Acc=0.9770 | Val Acc=0.9535 | F1=0.6145
+Epoch 19: Train Loss=0.2483 | Train Acc=0.9772 | Val Acc=0.9535 | F1=0.6170
+Epoch 20: Train Loss=0.2463 | Train Acc=0.9774 | Val Acc=0.9522 | F1=0.6051
+
+--- Final Metrics ---
+Final Train Acc: 0.9774
+Final Val Acc:   0.9522
+Final F1 Score:  0.6051
+Confusion Matrix letzte Epoche:
+[[605084,  14737],
+ [ 16823,  24176]]

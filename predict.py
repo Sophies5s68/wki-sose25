@@ -22,7 +22,7 @@ import torch
 import torch.nn as nn
 from CNN_model import CNN_EEG
 from new_preprocess import preprocess_signal_with_montages
-from features_predict import window_prediction, feature_extraction_window
+from new_features import window_prediction, features_prediction
 #from CNN_dataset import window_data_evaluate, create_fixed_grid_maps
 from glob import glob
 from scipy.signal import iirnotch, butter, sosfiltfilt, resample_poly, tf2sos
@@ -79,7 +79,7 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     data_for_class = []
     # Feature extraction and brain map calculation
     for win in windows:
-        features = feature_extraction_window(win, fs, stft_window_size, stft_overlap) # shape: (n_channels, n_features)
+        features = features_prediction(win, fs, stft_window_size, stft_overlap) # shape: (n_channels, n_features)
         assert not np.isnan(features).any(), "NaN in features!"
         x = torch.tensor(features, dtype = torch.float)
         data_for_class.append(x)
@@ -166,3 +166,4 @@ def resample_signal(signal, original_fs, target_fs=256):
     up = int(target_fs // gcd)
     down = int(original_fs // gcd)
     return resample_poly(signal, up, down, axis=-1)
+

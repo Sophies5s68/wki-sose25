@@ -4,8 +4,10 @@ import torch.nn.functional as F
 from sklearn.metrics import f1_score
 
 class CNN_EEG(nn.Module):
-    def __init__(self, in_channels, n_classes):
+    def __init__(self, in_channels, n_classes, activation_fn = nn.ReLU()):
         super(CNN_EEG, self).__init__()
+        
+        self.activation = activation_fn
         
         self.conv1 = nn.Conv1d(in_channels, out_channels = 64, kernel_size = 3, padding =1)
         self.bn1 = nn.BatchNorm1d(64) # mal ausprobieren
@@ -20,10 +22,10 @@ class CNN_EEG(nn.Module):
         flattened_size = self._get_flattened_size(in_channels) # Eingangsgröße muss angepasst werden
         self.classifier = nn.Sequential(
             nn.Linear(flattened_size, 512),
-            nn.ReLU(),
+            self.activation,
             nn.Dropout(0.5),
             nn.Linear(512, 128),
-            nn.ReLU(),
+            self.activation,
             nn.Dropout(0.3),
             nn.Linear(128, n_classes)
         )
@@ -49,37 +51,29 @@ class CNN_EEG(nn.Module):
 def train_model(model, train_loader, optimizer, loss_fn, device='cpu'):
     model.train()
     total_loss = 0
-    correct = 0
-    total = 0
     for x, y in train_loader:
         x = x.to(device)
-        y = y.to(device).float().unsqueeze(1)  # Labels als Float und [Batch,1]
+        y = y.to(device).float().unsqueeze(1)
 
         optimizer.zero_grad()
-        with torch.autograd.set_detect_anomaly(True):
-            logits = model(x)               # Roh-Output, Shape [B,1]
-            probs = torch.sigmoid(logits)  # Wahrscheinlichkeiten
+        logits = model(x)
+        probs = torch.sigmoid(logits)
 
-            if torch.isnan(probs).any() or torch.isinf(probs).any():
-                print("NaN oder Inf im Output des Modells!")
-                print("Minimum:", probs.min().item(), "Maximum:", probs.max().item())
-                raise ValueError("Ungültige Werte im Modell-Output")
+        if torch.isnan(probs).any() or torch.isinf(probs).any():
+            print("NaN oder Inf im Output des Modells!")
+            print("Minimum:", probs.min().item(), "Maximum:", probs.max().item())
+            raise ValueError("Ungültige Werte im Modell-Output")
 
-            loss = loss_fn(logits, y)  # Dice Loss erwartet Wahrscheinlichkeiten und Float-Labels
-            loss.backward()
-
+        loss = loss_fn(logits, y)
+        loss.backward()
         torch.nn.utils.clip_grad_norm_(model.parameters(), max_norm=1.0)
         optimizer.step()
 
         total_loss += loss.item()
-        
-        preds = (probs > 0.5).long()
-        correct += (preds == y.long()).sum().item()
-        total += y.size(0)
 
     avg_loss = total_loss / len(train_loader)
-    accuracy = correct / total
-    return avg_loss, accuracy
+    return avg_loss
+
 
 
 def evaluate_model(model, test_loader, device='cpu'):

@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import StratifiedGroupKFold
-from CNN_model import CNN_EEG, train_model, evaluate_model  # Stelle sicher, dass du die Klasse separat speicherst
+from CNN_model import CNN_EEG_Improved, train_model, evaluate_model 
 import numpy as np
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay
 import matplotlib.pyplot as plt
@@ -235,7 +235,7 @@ class EarlyStopping:
 def main():
     
     data_folder = "data_new_window/win4_step1/" 
-    run_name = "SGD_opt"
+    run_name = "new_architect"
     
     # Standard Parameter
     epochs = 50
@@ -279,7 +279,7 @@ def main():
         pos_weight = neg / pos
         pos_weight_tensor = torch.tensor([pos_weight], dtype=torch.float32).to(device)
 
-        model = CNN_EEG(in_channels=dataset[0][0].shape[0], n_classes=1).to(device)
+        model = CNN_EEG_Improved(in_channels=dataset[0][0].shape[0], n_classes=1).to(device)
         optimizer = torch.optim.Adam(model.parameters(), lr=lr)
         loss_fn = CombinedLoss(pos_weight=pos_weight_tensor, alpha_dice=0.7, alpha_focal=0.3) 
         #loss_fn = CombinedLoss(pos_weight=pos_weight_tensor, alpha_dice=0.5, alpha_focal=0.5)
