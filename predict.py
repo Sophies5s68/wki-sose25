@@ -26,6 +26,7 @@ from new_features import window_prediction, features_prediction
 #from CNN_dataset import window_data_evaluate, create_fixed_grid_maps
 from glob import glob
 from scipy.signal import iirnotch, butter, sosfiltfilt, resample_poly, tf2sos
+from grouped_features import CNN_EEG_Conv2d_muster
 
 
 ###Signatur der Methode (Parameter und Anzahl return-Werte) darf nicht verändert werden
@@ -123,7 +124,7 @@ def predictions_ensemble(data_for_class: List[torch.Tensor], model_name: str, de
 
     with torch.no_grad():
         for path in file_paths:
-            model = CNN_EEG(6, 1).to(device)
+            model = CNN_EEG_Conv2d_muster(4, 1).to(device)
             model.load_state_dict(torch.load(path, map_location=device))
             model.eval()
             outputs = torch.sigmoid(model(batch_tensor)).squeeze(1)
