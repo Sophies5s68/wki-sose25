@@ -3,6 +3,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.metrics import f1_score
 
+# CNN Model das genutzt wurde um die Auswertung der verschiedenen Parameter zu machen. 
+# Dabei wurde noch keine Gruppierung der Features wie in der finalen Abgabe vorgenommen
+
 class CNN_EEG(nn.Module):
     def __init__(self, in_channels, n_classes, activation_fn = nn.ReLU()):
         super(CNN_EEG, self).__init__()

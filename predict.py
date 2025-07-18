@@ -95,14 +95,14 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
             "offset": 0.0,
             "offset_confidence": 0.0
         }
+    
     # Klassifikation
     predictions_per_window =[]
     with torch.no_grad():
-        probs = predictions_ensemble(data_for_class ,model_name, device)
-        predictions_per_window = [int(p > 0.84764403) for p in probs]
+        probs = predictions_ensemble(data_for_class, model_name, device)
 
     seizure_present = False
-    seizure_present, onset_candidate = detect_onset(predictions_per_window, timestamps, min_consecutive=2)
+    seizure_present, onset_candidate = detect_onset(probs, timestamps, min_consecutive=2)
     if seizure_present:
         onset = onset_candidate
 
@@ -122,17 +122,23 @@ def predictions_ensemble(data_for_class: List[torch.Tensor], model_name: str, de
     file_paths = sorted([os.path.join(model_name, f) for f in os.listdir(model_name) if f.endswith(".pth")])
     batch_tensor = torch.stack(data_for_class).to(device)
     probs = []
-
+    
+    # Threshold pro Modell aus externen Validierungsdatensatz:
+    best_thresholds = [0.792446, 0.8888646, 0.5540436, 0.5641926, 0.8125975]
+    
     with torch.no_grad():
-        for path in file_paths:
+        for idx, path in enumerate(file_paths):
             model = CNN_EEG_Conv2d_muster(4, 1).to(device)
-            #model = CNN_EEG(6,1).to(device)
             model.load_state_dict(torch.load(path, map_location=device))
             model.eval()
             outputs = torch.sigmoid(model(batch_tensor)).squeeze(1)
-            probs.append(outputs.cpu().numpy())  # shape: (num_windows,)
-
-    ensemble_probs = np.median(probs, axis=0)  # Mittelwert pro Fenster
+            prob = outputs.cpu().numpy()  # shape: (num_windows,)
+            binary_preds = (prob > best_thresholds[idx]).astype(int)
+            probs.append(binary_preds)
+            
+    all_model_probs = np.stack(probs)  # shape: (n_models, n_windows)
+    votes_per_window = np.sum(all_model_probs, axis=0)  # shape: (n_windows,)
+    ensemble_probs = (votes_per_window >= 3).astype(int)                    
 
 
     # Sicherstellen, dass es immer eine Liste ist

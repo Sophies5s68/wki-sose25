@@ -9,7 +9,13 @@ GELU                             |  0.6251 |  0.4807 |  0.5254 |  0.4882 |  0.53
 SiLU                             |  0.6134 |  0.4781 |  0.5279 |  0.5185 |  0.5244 |  0.5325
 
 :
+2d_grouped_strong_augmentation_no_sampler_treshhold_tuning_muster_loss_angepasst |  0.5321 |  0.5241 |  0.5244 |  0.5639 |  0.6073 |  0.5504
+
+:
 new_architect                    |  0.5521 |  0.5646 |  0.5468 |  0.5262 |  0.6098 |  0.5599
+
+:
+2d_grouped_muster_augmentation   |  0.3809 |  0.3278 |  0.3040 |  0.3439 |  0.3670 |  0.3447
 
 batch_size:
 bs1024                           |  0.5307 |  0.5315 |  0.5364 |  0.5546 |  0.5870 |  0.5480
@@ -63,3 +69,10 @@ AdamW                            |  0.5383 |  0.5333 |  0.5164 |  0.5694 |  0.57
 
 :
 2d_grouped_muster_sampler_pos    |  0.4120 |  0.3469 |  0.3316 |  0.3897 |  0.4235 |  0.3807
+
+:
+2d_grouped_augmentation_no_sampler |  0.5212 |  0.5049 |  0.5153 |  0.5805 |  0.5919 |  0.5428
+
+:
+2d_grouped_strong_augmentation_no_sampler_treshhold_tuning |  0.5514 |  0.5094 |  0.5276 |  0.5738 |  0.6102 |  0.5545
+extra_val_tuning                 |  0.6071 |  0.6217 |  0.5523 |  0.5530 |  0.5490 |  0.5766

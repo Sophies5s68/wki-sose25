@@ -15,6 +15,7 @@ from torch.utils.data import WeightedRandomSampler
 from sklearn.model_selection import train_test_split
 from sklearn.metrics import f1_score, precision_score, recall_score
 from sklearn.metrics import precision_recall_curve
+from sklearn.model_selection import GroupShuffleSplit
 
 # Dataset zum Laden von gepackten Samples in .pt Dateien (je Datei viele Samples)
 class EEGWindowDatasetCombined(torch.utils.data.Dataset):
@@ -181,7 +182,7 @@ def main():
     torch.backends.cudnn.benchmark = True
     print("Datensatz geladen.")
 
-
+    '''
     # Fester Test-Set-Split (20%)
     train_idx_full, test_idx = train_test_split(
         range(len(dataset)),
@@ -189,6 +190,11 @@ def main():
         stratify=labels,
         random_state=42,
     )
+    '''
+    groups = [sample[2] for sample in dataset]  # eeg_id
+
+    splitter = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
+    train_idx_full, test_idx = next(splitter.split(X=range(len(dataset)), y=labels, groups=groups))
 
     # Test-Loader vorbereiten
     test_loader = DataLoader(Subset(dataset, test_idx), batch_size=batch_size, shuffle=False,
