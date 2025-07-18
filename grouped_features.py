@@ -238,24 +238,32 @@ def train_model(model, train_loader, optimizer, loss_fn, device='cpu'):
     return avg_loss, accuracy
 
 
-def evaluate_model(model, test_loader, device='cpu'):
+def evaluate_model(model, test_loader, device='cpu', return_probs=False):
     model.eval()
     correct = 0
     y_true = []
     y_pred = []
+    all_probs = []
 
     with torch.no_grad():
         for x, y, *_ in test_loader:
             x, y = x.to(device), y.to(device)
             out = model(x)
-            probs = torch.sigmoid(out)
-            preds = (probs > 0.5).long().view(-1)
+            probs = torch.sigmoid(out).view(-1)
+            preds = (probs > 0.5).long()
             y = y.long().view(-1)
             correct += (preds == y).sum().item()
 
             y_true.extend(y.cpu().tolist())
             y_pred.extend(preds.cpu().tolist())
+            if return_probs:
+                all_probs.append(probs.cpu())
 
     accuracy = correct / len(y_true)
     f1 = f1_score(y_true, y_pred, average='binary')
-    return accuracy, y_true, y_pred, f1
+
+    if return_probs:
+        all_probs = torch.cat(all_probs).numpy()
+        return accuracy, y_true, y_pred, f1, all_probs
+    else:
+        return accuracy, y_true, y_pred, f1

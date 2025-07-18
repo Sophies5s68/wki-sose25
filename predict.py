@@ -99,7 +99,7 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     predictions_per_window =[]
     with torch.no_grad():
         probs = predictions_ensemble(data_for_class ,model_name, device)
-        predictions_per_window = [int(p > 0.5) for p in probs]
+        predictions_per_window = [int(p > 0.84764403) for p in probs]
 
     seizure_present = False
     seizure_present, onset_candidate = detect_onset(predictions_per_window, timestamps, min_consecutive=2)
@@ -132,7 +132,7 @@ def predictions_ensemble(data_for_class: List[torch.Tensor], model_name: str, de
             outputs = torch.sigmoid(model(batch_tensor)).squeeze(1)
             probs.append(outputs.cpu().numpy())  # shape: (num_windows,)
 
-    ensemble_probs = np.mean(probs, axis=0)  # Mittelwert pro Fenster
+    ensemble_probs = np.median(probs, axis=0)  # Mittelwert pro Fenster
 
 
     # Sicherstellen, dass es immer eine Liste ist
