@@ -3,9 +3,14 @@ import torch.nn as nn
 import torch.nn.functional as F
 from sklearn.metrics import f1_score
 
+# Modell der Abgabe
+
 class Swish(nn.Module):
     def forward(self, x):
         return x * torch.sigmoid(x)
+    
+'''
+# Test einer CNN Architektur mit gruppierten Features und 1D Convolution
 
 class CNN_EEG_Improved(nn.Module):
     def __init__(self, in_channels=4, n_classes=1):
@@ -74,7 +79,10 @@ class CNN_EEG_Improved(nn.Module):
         x = torch.flatten(x, 1)
         x = self.classifier(x)
         return x
+'''
 
+'''
+# Architekturansatz mit 2d Convolution
 
 class CNN_EEG_Conv2d(nn.Module):
     def __init__(self, in_channels=4, n_classes=1):
@@ -138,7 +146,12 @@ class CNN_EEG_Conv2d(nn.Module):
         x = torch.flatten(x, 1)             # (B, 384)
         x = self.classifier(x)
         return x
+'''
 
+# Aktuelles Modell
+# nutzt variable Filterlängen und 2d Convolution
+# perumtiert den Input um (B, 4, 6, 5) zu erzeugen
+# soll 
 class CNN_EEG_Conv2d_muster(nn.Module):
     def __init__(self, in_channels=4, n_classes=1):
         super(CNN_EEG_Conv2d_muster, self).__init__()
