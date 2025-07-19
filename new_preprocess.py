@@ -2,7 +2,7 @@ import numpy as np
 import scipy.signal as sps
 from wettbewerb import get_6montages
 
-# Datei zum Vorverarbeiten der Daten
+# ---- Datei um die Daten zu Verarbeiten ----
 
 # Resampling, um Data auf die gleiche Samplingrate zu bringen
 def resample_signal(sig, original_fs, target_fs=256):

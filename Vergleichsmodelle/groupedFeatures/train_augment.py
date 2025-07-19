@@ -3,7 +3,7 @@ import torch
 import torch.nn as nn
 from torch.utils.data import Dataset, DataLoader, Subset
 from sklearn.model_selection import StratifiedGroupKFold
-from grouped_features import train_model, evaluate_model, CNN_EEG_Conv2d_muster
+from grouped_features import CNN_EEG_Conv2d, train_model, CNN_EEG_Conv2d_muster, CNN_EEG_Improved
 import numpy as np
 from sklearn.metrics import confusion_matrix
 import matplotlib.pyplot as plt
@@ -12,53 +12,98 @@ from collections import Counter
 import gc
 import csv
 from torch.utils.data import WeightedRandomSampler
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import f1_score, precision_score, recall_score
-from sklearn.metrics import precision_recall_curve
-from sklearn.model_selection import GroupShuffleSplit
+from sklearn.metrics import f1_score
 
-# ---- Datei zum Trainierne des Modells ----
+# ---- Datei zum Trainierne des Modells mit augmentierten Daten ----
 
-# ===== Dataset-Klasse =====
-# Liest gespeicherte EEG-Samples aus .pt-Dateien, die mehrere Fenster pro Datei enthalten
+# Dataset zum Laden von gepackten Samples in .pt Dateien (je Datei viele Samples)
 class EEGWindowDatasetCombined(torch.utils.data.Dataset):
-    def __init__(self, folder):
-        self.samples = []  # Liste von Tupeln (x, y, eeg_id, timestamp)
-        
+    def __init__(self, folder, augment=False):
+        self.samples = []
+        self.augment = augment
+
         for filename in os.listdir(folder):
             if not filename.endswith(".pt"):
                 continue
-            data = torch.load(os.path.join(folder, filename))  # dict mit x, y, eeg_id, timestamp
-            
-            x_all = data["x"]           # Tensor (N, 4, group_features, 6)
-            y_all = data["y"]           # Tensor (N,)
-            eeg_id_all = data["eeg_id"] # Liste (N)
-            timestamp_all = data["timestamp"]  # Liste (N)
-            
+            data = torch.load(os.path.join(folder, filename))
+            x_all = data["x"]
+            y_all = data["y"]
+            eeg_id_all = data["eeg_id"]
+            timestamp_all = data["timestamp"]
+
             for i in range(len(y_all)):
-                sample = (
-                    x_all[i],           # Tensor (4, group_features, 6)
-                    y_all[i].item(),    # Label als int
-                    eeg_id_all[i],      # Group (z.B. ID als str oder int)
-                    timestamp_all[i],   # Timestamp (z.B. float)
-                )
-                self.samples.append(sample)
+                self.samples.append((x_all[i], y_all[i].item(), eeg_id_all[i], timestamp_all[i]))
 
     def __len__(self):
         return len(self.samples)
 
     def __getitem__(self, idx):
-        return self.samples[idx]
-    
-     # Gibt die Labels und Gruppen-IDs (eeg_id) aller Samples zurück
+        x, y, eeg_id, ts = self.samples[idx]
+
+        if self.augment and y == 1:
+            if torch.rand(1).item() < 0.4:
+                x = add_noise(x)
+            if torch.rand(1).item() < 0.2:
+                x = time_mask(x)
+            if torch.rand(1).item() < 0.2:
+                x = segment_permutation(x)
+            if torch.rand(1).item() < 0.2:
+                x = channel_dropout(x)
+
+            # Mixup with another random positive
+            if torch.rand(1).item() < 0.2:
+                other_idx = torch.randint(0, len(self.samples), (1,)).item()
+                x_mix, _ = mixup_positive((x, y, eeg_id, ts), self.samples[other_idx])
+                x = x_mix
+
+        return x, y, eeg_id, ts
+
     def get_labels_and_groups(self):
         labels = [sample[1] for sample in self.samples]
         groups = [sample[2] for sample in self.samples]
         return labels, groups
 
+    
+# ===== Augmentation-Funktionen =====
+def add_noise(x, mean=0.0, std=0.01):
+    return x + torch.randn_like(x) * std
+
+def time_mask(x, max_width=2):
+    x = x.clone()
+    T = x.shape[-1]
+    width = np.random.randint(1, max_width + 1)
+    start = np.random.randint(0, T - width + 1)
+    x[..., start:start+width] = 0
+    return x
+
+def segment_permutation(x, segments=3):
+    x = x.clone()
+    T = x.shape[-1]
+    if T % segments != 0:
+        return x
+    seg_size = T // segments
+    idx = torch.randperm(segments)
+    return torch.cat([x[..., i*seg_size:(i+1)*seg_size] for i in idx], dim=-1)
+
+def channel_dropout(x, p=0.25):
+    """ Randomly zero out 1 EEG channel (i.e., one of the 4 groups) """
+    if torch.rand(1).item() < p:
+        idx = torch.randint(0, x.shape[0], (1,))
+        x[idx] = 0
+    return x
+
+def mixup_positive(sample1, sample2, alpha=0.4):
+    lam = np.random.beta(alpha, alpha)
+    x1, y1, _, _ = sample1
+    x2, y2, _, _ = sample2
+    if y1 == 1 and y2 == 1:
+        x_mix = lam * x1 + (1 - lam) * x2
+        return x_mix, 1
+    return x1, y1
+
 
 # ===== Loss-Funktionen =====
-# Dice Loss: robust bei Klassenungleichgewicht, misst Überlappung
+# Dice Loss für bessere Balance bei Ungleichgewicht
 class DiceLoss(nn.Module):
     def __init__(self, smooth=1e-6):
         super().__init__()
@@ -73,7 +118,7 @@ class DiceLoss(nn.Module):
         return 1 - dice
 
 
-# Focal Loss: bestraft falsch klassifizierte Beispiele stärker
+# Focal Loss mit pos_weight zur Behandlung von Klassenungleichgewicht
 class FocalLossWithPosWeight(nn.Module):
     def __init__(self, pos_weight=1.0, alpha=0.25, gamma=2.0):
         super().__init__()
@@ -107,6 +152,7 @@ class CombinedLoss(nn.Module):
         loss_focal = self.focal_loss(preds, targets)
         return self.alpha_dice * loss_dice + self.alpha_focal * loss_focal
 
+
 # ===== Early Stopping =====
 # Beendet Training frühzeitig, wenn sich der F1-Score nicht verbessert
 class EarlyStopping:
@@ -136,51 +182,50 @@ class EarlyStopping:
             self.best_model_state = model.state_dict()
             self.counter = 0
 
-# ===== Threshold-Tuning =====
-# Findet optimalen Entscheidungs-Threshold für bestes F1
-def threshold_tuning(model, loader, device):
+# Datei zum Evaluieren des trainierten Modells           
+def evaluate_model(model, test_loader, device='cpu'):
     model.eval()
-    all_preds = []
-    all_labels = []
+    y_true = []
+    y_probs = []
+
     with torch.no_grad():
-        for x, y, *_ in loader:
-            x = x.to(device)
-            y = y.to(device).float()
-            logits = model(x).squeeze()
-            probas = torch.sigmoid(logits)
-            all_preds.append(probas.cpu().numpy())
-            all_labels.append(y.cpu().numpy())
+        for x, y, *_ in test_loader:
+            x, y = x.to(device), y.to(device)
+            out = model(x)
+            probs = torch.sigmoid(out).view(-1)
+            y_true.extend(y.cpu().tolist())
+            y_probs.extend(probs.cpu().tolist())
 
-    y_true = np.concatenate(all_labels)
-    y_probs = np.concatenate(all_preds)
+    y_true = np.array(y_true)
+    y_probs = np.array(y_probs)
 
-    precisions, recalls, thresholds = precision_recall_curve(y_true, y_probs)
+    best_thresh = 0.5
+    best_f1 = 0
+    for t in np.linspace(0.1, 0.9, 17):
+        preds = (y_probs > t).astype(int)
+        f1 = f1_score(y_true, preds)
+        if f1 > best_f1:
+            best_f1 = f1
+            best_thresh = t
 
-    f1_scores = 2 * (precisions * recalls) / (precisions + recalls + 1e-8)
-    best_idx = np.argmax(f1_scores)
-    best_threshold = thresholds[best_idx]
-    best_f1 = f1_scores[best_idx]
-    best_precision = precisions[best_idx]
-    best_recall = recalls[best_idx]
+    final_preds = (y_probs > best_thresh).astype(int)
+    accuracy = (final_preds == y_true).mean()
 
-    return best_threshold, best_f1, best_precision, best_recall
-
+    return accuracy, y_true.tolist(), final_preds.tolist(), best_f1
 
 # ===== Hauptfunktion (Training, Validierung, Tuning, Speichern) =====
 def main():
-    # Initiale Konfiguration
-    data_folder = "data_new_window/win4_step1_groups/" # abgespeicherte extrahierte Features
-    run_name = "extra_val_tuning_lr3"
-    
+    data_folder = "data_new_window/win4_step1_groups/"
+    run_name = "2d_grouped_strong_augmentation_no_sampler_treshhold_tuning_muster_loss_angepasst"
+
     epochs = 50
     batch_size = 1024
-    lr = 1e-3
-    
+    lr = 1e-4
+
     print(f"Training von {run_name}")
     device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
     print(f"Training auf Gerät: {device}")
-    
-    #Lade Datensätze
+
     file_paths = sorted(glob(os.path.join(data_folder, "*.pt")))
     if not file_paths:
         print(f"[WARNUNG] Keine .pt-Dateien in {data_folder} gefunden – Abbruch.")
@@ -191,20 +236,8 @@ def main():
     torch.backends.cudnn.benchmark = True
     print("Datensatz geladen.")
 
-    # Split 80% Training/Validierung 20% Test
-    groups = [sample[2] for sample in dataset] 
-
-    splitter = GroupShuffleSplit(n_splits=1, test_size=0.2, random_state=42)
-    train_idx_full, test_idx = next(splitter.split(X=range(len(dataset)), y=labels, groups=groups))
-
-    # Test-Loader vorbereiten
-    test_loader = DataLoader(Subset(dataset, test_idx), batch_size=batch_size, shuffle=False,
-                             num_workers=4, pin_memory=True)
-    
-    # 5 Folds k Fold und trainieren sowie abspeichern von jeweils 5 Modellen
     sgkf = StratifiedGroupKFold(n_splits=5, shuffle=True, random_state=42)
-    
-    threshold_results = []
+
     all_confusion_matrices = []
     all_best_model_states = []
     all_train_losses = []
@@ -212,42 +245,45 @@ def main():
     all_val_accuracies = []
     all_f1_scores = []
 
-    # Neue Labels + Gruppen für Training-only Set
-    train_labels_full = [labels[idx] for idx in train_idx_full]
-    train_groups_full = [groups[idx] for idx in train_idx_full]
+    for i, (train_idx, val_idx) in enumerate(sgkf.split(X=range(len(dataset)), y=labels, groups=groups)):
+        print(f"========== FOLD {i} ==========")
+    
+        # Augmentation for positive samples only
+        augmented_dataset = EEGWindowDatasetCombined(data_folder, augment=True)
+        train_subset = Subset(augmented_dataset, train_idx)
 
-    # Splitten des 80 Prozentigen Set in Train und Validierung und durchführen eines K-Fold
-    for i, (train_idx, val_idx) in enumerate(
-            sgkf.split(X=train_idx_full, y=train_labels_full, groups=train_groups_full)):
+        # Use standard DataLoader with shuffle
+        train_loader = DataLoader(
+            train_subset,
+            batch_size=batch_size,
+            shuffle=True,
+            num_workers=4,
+            pin_memory=True,
+            persistent_workers=True
+        )
+        val_loader = DataLoader(Subset(dataset, val_idx), batch_size=batch_size, shuffle=False,
+                                num_workers=4, pin_memory=True)
 
-        train_indices = [train_idx_full[i] for i in train_idx]
-        val_indices = [train_idx_full[i] for i in val_idx]
-
-        train_loader = DataLoader(Subset(dataset, train_indices), batch_size=batch_size, shuffle=True,
-                                   num_workers=4, pin_memory=True, persistent_workers=True)
-
-        val_loader = DataLoader(Subset(dataset, val_indices), batch_size=batch_size, shuffle=False,
-                                 num_workers=4, pin_memory=True)
-
-        # Klassenverhältnis berechnen
-        train_labels = [labels[idx] for idx in train_indices]
+        train_labels = [labels[idx] for idx in train_idx]
         counter = Counter(train_labels)
+        print(f"Fold {i}: Class distribution: {counter}")
         neg, pos = counter[0], counter[1]
         pos_weight = neg / pos if pos > 0 else 1.0
         pos_weight_tensor = torch.tensor([pos_weight], dtype=torch.float32).to(device)
         
-        # Modell, Optimierer, Loss und EarlyStopper
+        # Erstmal ausprobieren, ob mit pos weight = 1, da sonst overfitting passiernen könnte
+        #pos_weight_tensor = torch.tensor([1.0], dtype=torch.float32).to(device)
         model = CNN_EEG_Conv2d_muster(in_channels=dataset[0][0].shape[0], n_classes=1).to(device)
-        optimizer = torch.optim.AdamW(model.parameters(), lr=lr, weight_decay=0.01)
-        loss_fn = CombinedLoss(pos_weight=pos_weight_tensor, alpha_dice=0.7, alpha_focal=0.3)
+        optimizer = torch.optim.AdamW(model.parameters(), lr=1e-3, weight_decay=0.01)
+        loss_fn = CombinedLoss(pos_weight=pos_weight_tensor, alpha_dice=0.8, alpha_focal=0.2, focal_gamma=1.0)
+
         early_stopper = EarlyStopping(patience=5, verbose=True)
-        
-        # Trainingsloop mit EarlyStopping
+
         fold_train_losses = []
         fold_train_accuracies = []
         fold_val_accuracies = []
         fold_f1 = []
-        
+
         for epoch in range(epochs):
             train_loss, train_acc = train_model(model, train_loader, optimizer, loss_fn, device)
             val_acc, y_true, y_pred, f1 = evaluate_model(model, val_loader, device)
@@ -259,7 +295,7 @@ def main():
             fold_train_accuracies.append(train_acc)
             fold_val_accuracies.append(val_acc)
             fold_f1.append(f1)
-            # Early Stopping wenn F1 5mal nicht verbessert
+
             early_stopper(f1, model)
             if early_stopper.early_stop:
                 print("  --> Early stopping ausgelöst.")
@@ -273,29 +309,14 @@ def main():
         all_val_accuracies.append(fold_val_accuracies)
         all_f1_scores.append(fold_f1)
 
-        
+        del train_loader, val_loader, model
         torch.cuda.empty_cache()
         gc.collect()
-        # Ergebnisse speichern
-        model.load_state_dict(early_stopper.best_model_state)
-        best_threshold, best_f1, best_prec, best_rec = threshold_tuning(model, test_loader, device)
-
-        print(f"Best Threshold (Fold {i}): {best_threshold:.4f} | F1={best_f1:.4f} | Precision={best_prec:.4f} | Recall={best_rec:.4f}")
-
-        # Speichere Ergebnisse
-        threshold_results.append({
-            "fold": i,
-            "best_threshold": best_threshold,
-            "f1": best_f1,
-            "precision": best_prec,
-            "recall": best_rec
-        })
 
     # Speicherpfade erstellen
-    save_path = os.path.join("latest_models", run_name)
+    save_path = os.path.join("models_newWin", run_name)
     os.makedirs(save_path, exist_ok=True)
-    
-   
+
     result_path = os.path.join(save_path, "results")
     os.makedirs(result_path, exist_ok=True)
 
@@ -339,12 +360,6 @@ def main():
                     round(all_f1_scores[fold][epoch], 4)
                 ])
 
-    threshold_csv_path = os.path.join(result_path, "threshold_tuning_results.csv")
-    with open(threshold_csv_path, "w", newline="") as csvfile:
-        writer = csv.DictWriter(csvfile, fieldnames=["fold", "best_threshold", "f1", "precision", "recall"])
-        writer.writeheader()
-        for row in threshold_results:
-            writer.writerow(row)
-            
+
 if __name__ == "__main__":
     main()

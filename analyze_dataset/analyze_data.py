@@ -6,29 +6,28 @@ from typing import Tuple, List
 import numpy as np
 from wettbewerb import load_references
 
+# --- Code zum Analysieren des Datensatzes --- 
 
-# Code zum analysieren des vorliegenden Datasets
-
-
+# Extrahiert Patienten-ID
 def extract_patient_id(recording_id: str) -> str:
     return recording_id.split('_')[0]
 
 def analyze_dataset(folder: str = '../shared_data/training', output_prefix: str = 'dataset_stats'):
-    total_files = 6265 
-    batch_size = 100
+    total_files = 6265 #Gesamtzahl der EEG-Dateien
+    batch_size = 100 # Verarbeitung in Batches
     idx = 0
 
     
-    # wichtige Statistiken:
+    # Initialisieren der Statistiken
     pos_count = 0
     neg_count = 0
     patient_counter = Counter()
     reference_counter = Counter()
     sampling_freq_counter = Counter()
-    channel_stats = []
-    data_length_stats = []
+    channel_stats = []    # Anzahl der Kanäle pro Datei
+    data_length_stats = []  # Dauer/Länge der EEG-Signale
     
-    # durch alle Daten iterieren und wichtige Werte abspeichern
+    # Durch alle Daten iterieren und wichtige Werte abspeichern
     while idx < total_files:
         result = load_references(folder=folder, idx=idx)
         if result is None:
@@ -53,7 +52,7 @@ def analyze_dataset(folder: str = '../shared_data/training', output_prefix: str 
 
         idx += batch_size
 
-    # Zusammenfassung und abspeichern in dict
+    # Zusammenfassung und Abspeichern in dict
     stats = {
         "label_distribution": {
             "positive": pos_count,
@@ -78,12 +77,13 @@ def analyze_dataset(folder: str = '../shared_data/training', output_prefix: str 
         }
     }
 
-    # speichern als JSON
+    # Speichern als JSON
     json_file = output_prefix + '.json'
     with open(json_file, 'w') as f:
         json.dump(stats, f, indent=4)
 
-    # Speichern der verschiedenen CSV Dateien mit den extrahierten Werten
+    # Speichern der verschiedenen CSV Dateien
+    # Patientenstatistik
     csv_patient_file = output_prefix + '_recordings_per_patient.csv'
     with open(csv_patient_file, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
@@ -91,7 +91,8 @@ def analyze_dataset(folder: str = '../shared_data/training', output_prefix: str 
         for patient, count in patient_counter.most_common():
             writer.writerow([patient, count])
     print(" Patienten gespeichert")
-
+    
+    # Referenzsysteme
     csv_ref_file = output_prefix + '_reference_systems.csv'
     with open(csv_ref_file, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)
@@ -99,7 +100,8 @@ def analyze_dataset(folder: str = '../shared_data/training', output_prefix: str 
         for ref, count in reference_counter.items():
             writer.writerow([ref, count])
     print(" Referenzsysteme gespeichert")
-
+    
+    # Samplingfrequenzen
     csv_sf_file = output_prefix + '_sampling_frequencies.csv'
     with open(csv_sf_file, 'w', newline='') as csvfile:
         writer = csv.writer(csvfile)

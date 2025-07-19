@@ -1,1 +1,0 @@
-Modell und training in Ordner spectral_flat

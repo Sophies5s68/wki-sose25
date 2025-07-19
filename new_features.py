@@ -30,7 +30,7 @@ def window_eeg_data(signal, resampled_fs, seizure_onset, seizure_offset, window_
     - timestamps: Liste von Zeitstempeln für den Start jedes Fensters
     - used_whole_recording: True, wenn das gesamte Signal verwendet wurde, weil es kürzer als Fensterlänge war
     '''
-    #Prüfen ob Signal die richtige Form zum Fenstenr hat 
+    # Prüfen ob Signal die richtige Form zum Fenstenr hat 
     if signal.ndim != 2:
         raise ValueError("Signal muss 2D sein mit (channels,samples)")
     
@@ -122,59 +122,8 @@ def window_prediction(signal, resampled_fs, window_size, step_size):
         timestamps.append(start / resampled_fs)
 
     return windows, timestamps, used_whole_recording
-'''
-# Windowing mit kleineren Windows während Anfällen um Samples für Anfälle zu steigern
-# nicht mehr verwendet
 
-def window_eeg_data_variable(signal, resampled_fs, seizure_onset, seizure_offset, 
-                              normal_window_size, normal_step_size,
-                              seizure_window_size, seizure_step_size):
-    """
-    Fenster EEG-Daten mit variabler Fenstergröße: kleinere Fenster während Anfällen.
 
-    Returns:
-    - windows: Liste mit nparrays, mit der shape (n_channels, window_samples)
-    - labels: Liste mit 0 (kein Anfall) und 1 (Anfall)
-    - timestamps: Liste mit Zeiten von den Fenstern in Sekunden
-    """
-    if signal.ndim != 2: 
-        raise ValueError("Signal muss 2D sein, der Größe (n_channels, n_samples)")
-
-    n_channels, n_samples = signal.shape
-    windows, labels, timestamps = [], [], []
-
-    current_time = 0.0
-    while True:
-        # Entscheide, ob wir im Anfall sind oder nicht
-        if seizure_onset <= current_time <= seizure_offset:
-            window_size = seizure_window_size
-            step_size = seizure_step_size
-        else:
-            window_size = normal_window_size
-            step_size = normal_step_size
-
-        window_samples = int(window_size * resampled_fs)
-        step_samples = int(step_size * resampled_fs)
-        start = int(current_time * resampled_fs)
-        end = start + window_samples
-        
-        if end > n_samples:
-            break
-
-        window = signal[:, start:end]
-        windows.append(window)
-        timestamps.append(current_time)
-
-        # Setze Label
-        if (current_time + window_size) >= seizure_onset and current_time <= seizure_offset:
-            labels.append(1)
-        else:
-            labels.append(0)
-
-        current_time += step_size
-
-    return windows, labels, timestamps
-'''
 # Berechnen der Indizes
 def get_band_indices(f):
     return {band: np.logical_and(f >= fmin, f <= fmax) for band, (fmin, fmax) in bands.items()}
@@ -260,60 +209,7 @@ def feature_extraction_window(signals, fs):
     return standardize_matrix(np.asarray(feature_matr))
 
 
-
-## Methode um Features des gefensterten EEG-Signals zu extrahieren, wird mit STFT verwendet, um Laufzeit zu verbessern ##
-def features_prediction(signals, fs, stft_window_size, stft_overlap):
-    '''
-    Extrahiert frequenz- und zeitraumbasierte Merkmale aus einem mehrkanaligen EEG-Fenster.
-    
-    Inputs:
-    - signals: 2D-Array der Form (n_channels, n_samples), enthält das EEG-Fenster
-    - fs: Sampling-Frequenz (Hz) des Signals
-    - stft_window_size: Fenstergröße für die STFT (in Sekunden)
-    - stft_overlap: Überlappung der STFT-Fenster (zwischen 0 und 1)
-
-    Outputs:
-    - matrix: 2D-Array der Form (n_channels, n_features), enthält extrahierte und normalisierte Features pro Kanal
-
-    Beschreibung der Features pro Kanal:
-    - 5x spektrale Leistungen in typischen EEG-Bändern (z.B. Delta, Theta, Alpha, Beta, Gamma)
-    - 5x mittlere spektrale Amplituden für dieselben Bänder
-    - 3x Hjorth-Parameter (Aktivität, Mobilität, Komplexität)
-    - 1x spektrale Entropie
-    - 1x Petrosian Fractal Dimension
-    '''
-    
-    n_channels, n_samples = signals.shape
-    nperseg = int(stft_window_size * fs)
-    noverlap = int(nperseg * stft_overlap)
-    feature_matr = []
-
-    for channel in signals:
-        if np.all(channel == 0) or np.isnan(channel).any() or np.isinf(channel).any(): # Falls Kanal fehlerhaft ist, wird er mit einem Null-Vektor ersetzt
-            feature_matr.append(np.zeros(15))  # 5 Bänder x 2 + 5 extra features
-            continue
-        # Berechnung der STFT
-        f, _, Zxx = stft(channel, fs=fs, nperseg=nperseg, noverlap=noverlap)
-        psd = np.abs(Zxx) ** 2
-        avg_spectrum = np.mean(psd, axis=1)
-        idx_dict = get_band_indices(f)
-
-        spectral_pwr = spectral_power(avg_spectrum, idx_dict)
-        mean_amp = mean_spectral_amplitude(avg_spectrum, idx_dict)
-
-        try:
-            hjorth_act, hjorth_mob, hjorth_comp = hjorthparameters(channel)
-            spec_ent = spectral_entropy(f, avg_spectrum)
-            pfd = petrosian_fd(channel)
-        except:
-            hjorth_act, hjorth_mob, hjorth_comp, spec_ent, pfd = [0.0] * 5
-
-        features = spectral_pwr + mean_amp + [hjorth_act, hjorth_mob, hjorth_comp, spec_ent, pfd]
-        feature_matr.append(np.asarray(features))
-
-    matrix = np.asarray(feature_matr)
-    return standardize_matrix(matrix)
-
+## Methode um gruppierte Features des gefensterten EEG-Signals zu extrahieren, wird mit STFT verwendet, um Laufzeit zu verbessern ##
 def features_prediction_grouped(signals: np.ndarray, fs: float, stft_window_size: float, stft_overlap: float) -> torch.Tensor:
     '''
     Gibt die gruppierten Features zurück, wie sie für das CNN im Format (4, 5, 6) erwartet werden.
@@ -389,3 +285,60 @@ def features_prediction_grouped(signals: np.ndarray, fs: float, stft_window_size
 
     # (4, 5, 6)
     return torch.stack(padded_groups, dim=0)
+
+
+'''
+## Methode um Features des gefensterten EEG-Signals zu extrahieren, wird mit STFT verwendet, um Laufzeit zu verbessern ##
+# nicht mehr in Verwendung
+def features_prediction(signals, fs, stft_window_size, stft_overlap):
+    
+    Extrahiert frequenz- und zeitraumbasierte Merkmale aus einem mehrkanaligen EEG-Fenster.
+    
+    Inputs:
+    - signals: 2D-Array der Form (n_channels, n_samples), enthält das EEG-Fenster
+    - fs: Sampling-Frequenz (Hz) des Signals
+    - stft_window_size: Fenstergröße für die STFT (in Sekunden)
+    - stft_overlap: Überlappung der STFT-Fenster (zwischen 0 und 1)
+
+    Outputs:
+    - matrix: 2D-Array der Form (n_channels, n_features), enthält extrahierte und normalisierte Features pro Kanal
+
+    Beschreibung der Features pro Kanal:
+    - 5x spektrale Leistungen in typischen EEG-Bändern (z.B. Delta, Theta, Alpha, Beta, Gamma)
+    - 5x mittlere spektrale Amplituden für dieselben Bänder
+    - 3x Hjorth-Parameter (Aktivität, Mobilität, Komplexität)
+    - 1x spektrale Entropie
+    - 1x Petrosian Fractal Dimension
+    
+    
+    n_channels, n_samples = signals.shape
+    nperseg = int(stft_window_size * fs)
+    noverlap = int(nperseg * stft_overlap)
+    feature_matr = []
+
+    for channel in signals:
+        if np.all(channel == 0) or np.isnan(channel).any() or np.isinf(channel).any(): # Falls Kanal fehlerhaft ist, wird er mit einem Null-Vektor ersetzt
+            feature_matr.append(np.zeros(15))  # 5 Bänder x 2 + 5 extra features
+            continue
+        # Berechnung der STFT
+        f, _, Zxx = stft(channel, fs=fs, nperseg=nperseg, noverlap=noverlap)
+        psd = np.abs(Zxx) ** 2
+        avg_spectrum = np.mean(psd, axis=1)
+        idx_dict = get_band_indices(f)
+
+        spectral_pwr = spectral_power(avg_spectrum, idx_dict)
+        mean_amp = mean_spectral_amplitude(avg_spectrum, idx_dict)
+
+        try:
+            hjorth_act, hjorth_mob, hjorth_comp = hjorthparameters(channel)
+            spec_ent = spectral_entropy(f, avg_spectrum)
+            pfd = petrosian_fd(channel)
+        except:
+            hjorth_act, hjorth_mob, hjorth_comp, spec_ent, pfd = [0.0] * 5
+
+        features = spectral_pwr + mean_amp + [hjorth_act, hjorth_mob, hjorth_comp, spec_ent, pfd]
+        feature_matr.append(np.asarray(features))
+
+    matrix = np.asarray(feature_matr)
+    return standardize_matrix(matrix)
+'''

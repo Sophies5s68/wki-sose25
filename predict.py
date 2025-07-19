@@ -73,16 +73,16 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
     target_fs = 256
     original_fs = fs
  
+    # Vorverarbeiten der Daten
+    montage_names, montage_data, montage_missing, target_fs = preprocess_signal_with_montages(channels, data,target_fs,original_fs) 
     
-    montage_names, montage_data, montage_missing,target_fs = preprocess_signal_with_montages(channels, data,target_fs,original_fs) 
-    
+    # Fenstern der Daten
     windows, timestamps, used = window_prediction(montage_data, target_fs, window_size, step_size)
     data_for_class = []
-    # Feature extraction and brain map calculation
+    # Extrahieren der Features für jedes Fenster
     for win in windows:
         features = features_prediction_grouped(win, target_fs, stft_window_size, stft_overlap) # shape: (n_channels, n_features)
         assert not np.isnan(features).any(), "NaN in features!"
-        #x = torch.tensor(features, dtype = torch.float)
         data_for_class.append(features)
         
     # Notfallprüfung
@@ -96,11 +96,12 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
             "offset_confidence": 0.0
         }
     
-    # Klassifikation
+    # Klassifikation durch Mehrheitsentscheid der trainierten Modelle
     predictions_per_window =[]
     with torch.no_grad():
         probs = predictions_ensemble(data_for_class, model_name, device)
-
+    
+    # Bestimmen des Onsets falls Anfall erkennat wurde
     seizure_present = False
     seizure_present, onset_candidate = detect_onset(probs, timestamps, min_consecutive=2)
     if seizure_present:
@@ -119,6 +120,21 @@ def predict_labels(channels : List[str], data : np.ndarray, fs : float, referenc
 # 5 Modelle aus Stratified Fold für robustere Vorhersage
 
 def predictions_ensemble(data_for_class: List[torch.Tensor], model_name: str, device: torch.device) -> List[float]:
+    
+    '''
+    Führt Ensemble-Vorhersagen auf einer gegebenen Liste von EEG-Input-Tensoren durch,
+    indem mehrere gespeicherte Modelle geladen und ihre binären Vorhersagen über einen Mehrheitsentscheid
+    ausgewertet werden.
+
+    Parameter:
+    - data_for_class: Liste von Torch-Tensoren (einzelne EEG-Fenster), die zu einem Batch gestapelt werden.
+    - model_name: Pfad zu einem Verzeichnis mit gespeicherten Modellgewichten (*.pth).
+    - device: Das Torch-Gerät, auf dem gerechnet wird (z. B. "cuda" oder "cpu").
+
+    Rückgabe:
+    - Eine Liste binärer Ensemble-Vorhersagen (0 oder 1) für jedes EEG-Fenster.
+    '''
+    
     file_paths = sorted([os.path.join(model_name, f) for f in os.listdir(model_name) if f.endswith(".pth")])
     batch_tensor = torch.stack(data_for_class).to(device)
     probs = []
@@ -126,6 +142,7 @@ def predictions_ensemble(data_for_class: List[torch.Tensor], model_name: str, de
     # Threshold pro Modell aus externen Validierungsdatensatz:
     best_thresholds = [0.792446, 0.8888646, 0.5540436, 0.5641926, 0.8125975]
     
+    # Vorhersage der einzelnen Modelle mit ihrem individuellen Threshold aus dem Tuning
     with torch.no_grad():
         for idx, path in enumerate(file_paths):
             model = CNN_EEG_Conv2d_muster(4, 1).to(device)
@@ -149,6 +166,23 @@ def predictions_ensemble(data_for_class: List[torch.Tensor], model_name: str, de
 
 
 def detect_onset(predictions, timestamps, min_consecutive=2):
+    
+    """
+    Erkennt den Beginn (Onset) eines Anfalls anhand binärer Vorhersagen über Fenster.
+
+    Parameter:
+    - predictions: Liste oder Tensor mit binären Vorhersagen (0 oder 1) pro Fenster.
+    - timestamps: Liste mit Zeitpunkten (in Sekunden) zu jedem Fenster.
+    - min_consecutive: Minimale Anzahl aufeinanderfolgender positiver Vorhersagen,
+                       um einen Anfall zu bestätigen.
+
+    Rückgabe:
+    - Tuple (seizure_present: bool, onset_time: float oder None)
+      Gibt True und den Zeitpunkt des ersten bestätigten Anfallsfensters zurück,
+      falls mindestens min_consecutive Fenster hintereinander positiv sind.
+      Sonst False und None.
+    """
+    
     predictions = torch.tensor(predictions)
     for i in range(len(predictions) - min_consecutive + 1):
         if torch.all(predictions[i:i+min_consecutive] == 1):
@@ -156,23 +190,4 @@ def detect_onset(predictions, timestamps, min_consecutive=2):
     return False, None
 
 
-
-def notch_filter(signal, fs, freq=50.0, Q=30.0):
-    w0 = freq / (fs / 2)
-    b, a = iirnotch(w0, Q)
-    sos = tf2sos(b, a)  # Transferfunktion → SOS
-    return sosfiltfilt(sos, signal, axis=-1)
-
-
-def bandpass_filter(signal, fs, lowcut=1.0, highcut=120.0, order=4):
-    sos = sps.butter(order, [lowcut, highcut], btype='band', fs=fs, output='sos')
-    return sosfiltfilt(sos, signal, axis=-1)
-
-def resample_signal(signal, original_fs, target_fs=256):
-    if original_fs == target_fs:
-        return signal
-    gcd = np.gcd(int(original_fs), int(target_fs))
-    up = int(target_fs // gcd)
-    down = int(original_fs // gcd)
-    return resample_poly(signal, up, down, axis=-1)
 
